@@ -22,7 +22,8 @@ def simple_kml():
     for i in range(len(points)):
         cur_coord = [(longs[i], lats[i])]
         line_path.append((longs[i], lats[i]))
-        pnt = anoms_points.newpoint(name=points[i], coords=cur_coord)
+        pnt = anoms_points.newpoint(name=points[i], coords=cur_coord, visibility=0)
+
         pnt.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png'
         # pnt = fol.newpoint(name="Точка", coords=[(18.432314, -33.988862)])
 
