@@ -3,6 +3,8 @@ import pathlib
 import sys
 import dbf
 import simplekml
+import pandas as pd
+import DF_DBF
 
 
 def get_pname_lname(lang="EN"):
@@ -93,8 +95,8 @@ class bKML:
         tmp_points_folder = tmp_folder.newfolder(name=pname)
         tmp_lines_folder = tmp_folder.newfolder(name=lname)
 
-        for elem_id in range(len(description_tuple)):
-            current_coord = [(longitude_tuple[elem_id], latitude_tuple[elem_id])]
+        for elem_id, row in kml_data.iterrows():
+            current_coord = [(kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 2])]
             feature_line.append((longitude_tuple[elem_id], latitude_tuple[elem_id]))
             point = tmp_points_folder.newpoint(name=description_tuple[elem_id], coords=current_coord,
                                                visibility=point_visibility)
@@ -191,8 +193,8 @@ class bKML:
         tmp_points_folder = tmp_folder.newfolder(name=pname)
         tmp_lines_folder = tmp_folder.newfolder(name=lname)
 
-        for elem_id in range(len(description_tuple)):
-            current_coord = [(longitude_tuple[elem_id], latitude_tuple[elem_id])]
+        for elem_id, row in kml_data.iterrows():
+            current_coord = [(kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 2])]
             feature_line.append((longitude_tuple[elem_id], latitude_tuple[elem_id]))
             point = tmp_points_folder.newpoint(name=description_tuple[elem_id], coords=current_coord,
                                                visibility=point_visibility)
@@ -204,75 +206,88 @@ class bKML:
         line.style.linestyle.width = 3  # 3 pixels
 
 
-WELDS_ID = [901, 902, 903, 904, 905, 906]
-ML_ID = [101, 106, 32869, 3581198, 1081016421, 111]
-GEOM_ID = [201, 202]
+def main():
+    path = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\1nldm.dbf"
 
-welds_point_names = []
-welds_line = []
-welds_lats = []
-welds_longs = []
+    dbf_conv = DF_DBF.df_DBF(DBF_path=path)
+    df_DBF = dbf_conv.convert_dbf()
+    kml_data = df_DBF[["Feature", 'LATITUDE', 'LONGITUDE']]
 
-ml_point_names = []
-ml_line = []
-ml_lats = []
-ml_longs = []
+    bKML.kml_write_anomaly(feature_name="Потери металла", kml_data=kml_data)
 
-geom_point_names = []
-geom_lines = []
-geom_lats = []
-geom_longs = []
 
-SOURCE_NAME = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\1ntom.DBF"
+if __name__ == "__main__":
+    main()
 
-extention = SOURCE_NAME[-3:]
-
-if extention != 'dbf' and extention != 'DBF':
-    print("Wrong file Path")
-    input("Click any key for exit ")
-    sys.exit()
-
-newFormatRECOPY_SOURCE = dbf.Table(SOURCE_NAME, codepage='cp1251', on_disk=True)
-newFormatRECOPY_SOURCE.open(dbf.READ_WRITE)
-
-lang = "EN"
-
-bKML = bKML(lang=lang)
-
-with newFormatRECOPY_SOURCE:
-    for record in newFormatRECOPY_SOURCE:
-
-        lat = record.LATITUDE
-        long = record.LONGITUDE
-        dist = record.FEA_DIST
-        depth = record.FEA_DEPTH
-        wt = record.WT
-
-        if depth is not None and wt is not None:
-            depth = round(record.FEA_DEPTH / record.WT * 100, 1)
-        ml_description = f"Потеря металла, {dist}м, D {depth}%"
-        geom_description = f"Вмятина, {dist}м, D {depth}%"
-
-        if record.FEA_CODE in WELDS_ID:
-            welds_point_names.append(dist)
-            welds_longs.append(long)
-            welds_lats.append(lat)
-        if record.FEA_CODE in ML_ID:
-            ml_point_names.append(ml_description)
-            ml_longs.append(long)
-            ml_lats.append(lat)
-        if record.FEA_CODE in GEOM_ID:
-            geom_point_names.append(dist)
-            geom_longs.append(long)
-            geom_lats.append(lat)
-
-bKML.kml_write_anomaly(feature_name="Потери металла", kml_data=[ml_point_names, ml_lats, ml_longs],
-                       isvisible=[1, 0])
-bKML.kml_write_anomaly(feature_name="Вмятины",
-                       kml_data=[geom_point_names, geom_lats, geom_longs], isvisible=[1, 0])
-bKML.kml_write_top_lvl(feature_name="Трубные секции",
-                       kml_data=[welds_point_names, welds_lats, welds_longs], isvisible=[0, 1])
-
-bKML.kml_save("bKML_test")
-
-print("~~~Done~~~")
+# WELDS_ID = [901, 902, 903, 904, 905, 906]
+# ML_ID = [101, 106, 32869, 3581198, 1081016421, 111]
+# GEOM_ID = [201, 202]
+#
+# welds_point_names = []
+# welds_line = []
+# welds_lats = []
+# welds_longs = []
+#
+# ml_point_names = []
+# ml_line = []
+# ml_lats = []
+# ml_longs = []
+#
+# geom_point_names = []
+# geom_lines = []
+# geom_lats = []
+# geom_longs = []
+#
+# SOURCE_NAME = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\1ntom.DBF"
+#
+# extention = SOURCE_NAME[-3:]
+#
+# if extention != 'dbf' and extention != 'DBF':
+#     print("Wrong file Path")
+#     input("Click any key for exit ")
+#     sys.exit()
+#
+# newFormatRECOPY_SOURCE = dbf.Table(SOURCE_NAME, codepage='cp1251', on_disk=True)
+# newFormatRECOPY_SOURCE.open(dbf.READ_WRITE)
+#
+# lang = "EN"
+#
+# bKML = bKML(lang=lang)
+#
+# with newFormatRECOPY_SOURCE:
+#     for record in newFormatRECOPY_SOURCE:
+#
+#         lat = record.LATITUDE
+#         long = record.LONGITUDE
+#         dist = record.FEA_DIST
+#         depth = record.FEA_DEPTH
+#         wt = record.WT
+#
+#         if depth is not None and wt is not None:
+#             depth = round(record.FEA_DEPTH / record.WT * 100, 1)
+#         ml_description = f"Потеря металла, {dist}м, D {depth}%"
+#         geom_description = f"Вмятина, {dist}м, D {depth}%"
+#
+#         if record.FEA_CODE in WELDS_ID:
+#             welds_point_names.append(dist)
+#             welds_longs.append(long)
+#             welds_lats.append(lat)
+#         if record.FEA_CODE in ML_ID:
+#             ml_point_names.append(ml_description)
+#             ml_longs.append(long)
+#             ml_lats.append(lat)
+#         if record.FEA_CODE in GEOM_ID:
+#             geom_point_names.append(dist)
+#             geom_longs.append(long)
+#             geom_lats.append(lat)
+#
+# bKML.kml_write_anomaly(feature_name="Потери металла", kml_data=[ml_point_names, ml_lats, ml_longs],
+#                        isvisible=[1, 0])
+# bKML.kml_write_anomaly(feature_name="Вмятины",
+#                        kml_data=[geom_point_names, geom_lats, geom_longs], isvisible=[1, 0])
+# bKML.kml_write_top_lvl(feature_name="Трубные секции",
+#                        kml_data=[welds_point_names, welds_lats, welds_longs], isvisible=[0, 1])
+#
+# bKML.kml_save("bKML_test")
+#
+# print("~~~Done~~~")
