@@ -1,9 +1,4 @@
-import os.path
-import pathlib
-import sys
-import dbf
 import simplekml
-import pandas as pd
 import DF_DBF
 
 
@@ -44,30 +39,30 @@ class bKML:
 
             self.kml_anomalies_folder = self.kml.newfolder(name=fname)
 
-    def kml_make_constructions_folder(self, lang="RU"):
+    def kml_make_constructions_folder(self):
 
         if self.is_constructions_folder_exists is False:
             self.is_constructions_folder_exists = True
-            if lang == "RU":
+            if self.lang == "RU":
                 fname = "Конструктивные элементы"
-                pname, lname = get_pname_lname(lang)
+                pname, lname = get_pname_lname()
             else:
                 fname = "Construction elements"
-                pname, lname = get_pname_lname(lang)
+                pname, lname = get_pname_lname()
 
             self.kml_constructions_folder = self.kml.newfolder(name=fname)
 
-    def kml_make_others_folder(self, lang="RU"):
+    def kml_make_others_folder(self):
 
         if self.is_others_folder_exists is False:
             self.is_others_folder_exists = True
 
-            if lang == "RU":
+            if self.lang == "RU":
                 fname = "Прочие особенности"
-                pname, lname = get_pname_lname(lang)
+                pname, lname = get_pname_lname(self.lang)
             else:
                 fname = "Other features"
-                pname, lname = get_pname_lname(lang)
+                pname, lname = get_pname_lname(self.lang)
 
             self.kml_others_folder = self.kml.newfolder(name=fname)
 
@@ -75,10 +70,6 @@ class bKML:
         self.kml.save(f"{kml_name}.kml")
 
     def kml_write_anomaly(self, feature_name, kml_data, isvisible=None):
-
-        description_tuple = kml_data[0]
-        latitude_tuple = kml_data[1]
-        longitude_tuple = kml_data[2]
 
         self.kml_make_anomalies_folder()
 
@@ -93,25 +84,22 @@ class bKML:
 
         tmp_folder = self.kml_anomalies_folder.newdocument(name=feature_name)
         tmp_points_folder = tmp_folder.newfolder(name=pname)
-        tmp_lines_folder = tmp_folder.newfolder(name=lname)
+        # tmp_lines_folder = tmp_folder.newfolder(name=lname)
 
-        for elem_id, row in kml_data.iterrows():
-            current_coord = [(kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 2])]
-            feature_line.append((longitude_tuple[elem_id], latitude_tuple[elem_id]))
-            point = tmp_points_folder.newpoint(name=description_tuple[elem_id], coords=current_coord,
+        for elem_id in range(len(kml_data)):
+            current_coord = [(kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 1])]
+            feature_line.append((kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 1]))
+            point = tmp_points_folder.newpoint(name=kml_data.iloc[elem_id, 0], coords=current_coord,
                                                visibility=point_visibility)
-            point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png'
+            point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_square.png'
+            point.style.labelstyle.scale = 0.9
 
-        line = tmp_lines_folder.newlinestring(name="line", description="line",
-                                              coords=feature_line, visibility=line_visibility)
-        line.style.linestyle.color = simplekml.Color.red  # Red
-        line.style.linestyle.width = 3  # 3 pixels
+        # line = tmp_lines_folder.newlinestring(name="line", description="line",
+        #                                       coords=feature_line, visibility=line_visibility)
+        # line.style.linestyle.color = simplekml.Color.red  # Red
+        # line.style.linestyle.width = 3  # 3 pixels
 
     def kml_write_construction(self, feature_name, kml_data, isvisible=None):
-
-        description_tuple = kml_data[0]
-        latitude_tuple = kml_data[1]
-        longitude_tuple = kml_data[2]
 
         self.kml_make_constructions_folder()
 
@@ -126,25 +114,22 @@ class bKML:
 
         tmp_folder = self.kml_constructions_folder.newdocument(name=feature_name)
         tmp_points_folder = tmp_folder.newfolder(name=pname)
-        tmp_lines_folder = tmp_folder.newfolder(name=lname)
+        # tmp_lines_folder = tmp_folder.newfolder(name=lname)
 
-        for elem_id in range(len(description_tuple)):
-            current_coord = [(longitude_tuple[elem_id], latitude_tuple[elem_id])]
-            feature_line.append((longitude_tuple[elem_id], latitude_tuple[elem_id]))
-            point = tmp_points_folder.newpoint(name=description_tuple[elem_id], coords=current_coord,
+        for elem_id in range(len(kml_data)):
+            current_coord = [(kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 1])]
+            feature_line.append((kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 1]))
+            point = tmp_points_folder.newpoint(name=kml_data.iloc[elem_id, 0], coords=current_coord,
                                                visibility=point_visibility)
             point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png'
+            point.style.labelstyle.scale = 0.9
 
-        line = tmp_lines_folder.newlinestring(name="line", description="line",
-                                              coords=feature_line, visibility=line_visibility)
-        line.style.linestyle.color = simplekml.Color.red  # Red
-        line.style.linestyle.width = 3  # 3 pixels
+        # line = tmp_lines_folder.newlinestring(name="line", description="line",
+        #                                       coords=feature_line, visibility=line_visibility)
+        # line.style.linestyle.color = simplekml.Color.red  # Red
+        # line.style.linestyle.width = 3  # 3 pixels
 
     def kml_write_others(self, feature_name, kml_data, isvisible=None):
-
-        description_tuple = kml_data[0]
-        latitude_tuple = kml_data[1]
-        longitude_tuple = kml_data[2]
 
         self.kml_make_others_folder()
 
@@ -159,25 +144,22 @@ class bKML:
 
         tmp_folder = self.kml_others_folder.newdocument(name=feature_name)
         tmp_points_folder = tmp_folder.newfolder(name=pname)
-        tmp_lines_folder = tmp_folder.newfolder(name=lname)
+        # tmp_lines_folder = tmp_folder.newfolder(name=lname)
 
-        for elem_id in range(len(description_tuple)):
-            current_coord = [(longitude_tuple[elem_id], latitude_tuple[elem_id])]
-            feature_line.append((longitude_tuple[elem_id], latitude_tuple[elem_id]))
-            point = tmp_points_folder.newpoint(name=description_tuple[elem_id], coords=current_coord,
+        for elem_id in range(len(kml_data)):
+            current_coord = [(kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 1])]
+            feature_line.append((kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 1]))
+            point = tmp_points_folder.newpoint(name=kml_data.iloc[elem_id, 0], coords=current_coord,
                                                visibility=point_visibility)
             point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png'
+            point.style.labelstyle.scale = 0.9
 
-        line = tmp_lines_folder.newlinestring(name="line", description="line",
-                                              coords=feature_line, visibility=line_visibility)
-        line.style.linestyle.color = simplekml.Color.red  # Red
-        line.style.linestyle.width = 3  # 3 pixels
+        # line = tmp_lines_folder.newlinestring(name="line", description="line",
+        #                                       coords=feature_line, visibility=line_visibility)
+        # line.style.linestyle.color = simplekml.Color.red  # Red
+        # line.style.linestyle.width = 3  # 3 pixels
 
     def kml_write_top_lvl(self, feature_name, kml_data, isvisible=None):
-
-        description_tuple = kml_data[0]
-        latitude_tuple = kml_data[1]
-        longitude_tuple = kml_data[2]
 
         if isvisible is None:
             isvisible = [1, 0]
@@ -188,106 +170,97 @@ class bKML:
 
         pname, lname = get_pname_lname(self.lang)
 
+        if self.lang == "RU":
+            if feature_name in ['Шов', 'Weld']:
+                feature_name = "Трубные секции"
+        else:
+            if feature_name in ['Шов', 'Weld']:
+                feature_name = "Weld sections"
+
         tmp_folder = self.kml.newdocument(name=feature_name)
         tmp_folder.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png'
         tmp_points_folder = tmp_folder.newfolder(name=pname)
-        tmp_lines_folder = tmp_folder.newfolder(name=lname)
+        # tmp_lines_folder = tmp_folder.newfolder(name=lname)
 
-        for elem_id, row in kml_data.iterrows():
-            current_coord = [(kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 2])]
-            feature_line.append((longitude_tuple[elem_id], latitude_tuple[elem_id]))
-            point = tmp_points_folder.newpoint(name=description_tuple[elem_id], coords=current_coord,
+        for elem_id in range(len(kml_data)):
+            current_coord = [(kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 1])]
+            feature_line.append((kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 1]))
+            point = tmp_points_folder.newpoint(name=kml_data.iloc[elem_id, 0], coords=current_coord,
                                                visibility=point_visibility)
-            point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png'
+            if feature_name in ['Маркер', 'Marker']:
+                point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/flag.png'
+            else:
+                point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png'
+            point.style.labelstyle.scale = 0.9
+            point.style.iconstyle.scale = 0.8
 
-        line = tmp_lines_folder.newlinestring(name="line", description="line",
-                                              coords=feature_line, visibility=line_visibility)
-        line.style.linestyle.color = simplekml.Color.red  # Red
-        line.style.linestyle.width = 3  # 3 pixels
+        if line_visibility == 1:
+            tmp_lines_folder = tmp_folder.newfolder(name=lname)
+            line = tmp_lines_folder.newlinestring(name="line", description="line",
+                                                  coords=feature_line, visibility=line_visibility)
+            line.style.linestyle.color = simplekml.Color.rgb(217, 0, 0)
+            line.style.linestyle.width = 3  # 3 pixels
 
 
 def main():
-    path = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\1nldm.dbf"
+    toKML = bKML(lang="EN")
 
-    dbf_conv = DF_DBF.df_DBF(DBF_path=path)
-    df_DBF = dbf_conv.convert_dbf()
-    kml_data = df_DBF[["Feature", 'LATITUDE', 'LONGITUDE']]
+    path = input("Enter DBF path: ")
 
-    bKML.kml_write_anomaly(feature_name="Потери металла", kml_data=kml_data)
+    # path = r"1nopm.DBF"
+
+    dbf_conv = DF_DBF.df_DBF(DBF_path=path, lang="EN")
+    df_DBF = dbf_conv.convert_dbf(diameter=10.75)
+
+    # формируем описание для потерей
+    df_DBF['ML_DESCR'] = ''
+    df_DBF.loc[df_DBF['FEA_DEPTH_PRC'] != "", 'ML_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + df_DBF[
+        'Feature'] + ' ' + df_DBF['FEA_DEPTH_PRC'].astype(str) + '%'
+    df_DBF.loc[df_DBF['FEA_DEPTH_PRC'] == "", 'ML_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + df_DBF['Feature']
+
+    # описание для всего остального
+    df_DBF['OTH_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + df_DBF['Feature'] + ' ' + df_DBF['COMMENT']
+
+    anoms_df = df_DBF.loc[df_DBF['CLASS'] == 'ANOM']
+    anoms_list = anoms_df['Feature'].value_counts(ascending=True)
+    for current_anom_name, row in anoms_list.items():
+        current_anom_df = df_DBF.loc[df_DBF['Feature'] == current_anom_name]
+        anom_kml_data = current_anom_df[["ML_DESCR", 'LATITUDE', 'LONGITUDE']]
+        toKML.kml_write_anomaly(feature_name=current_anom_name, kml_data=anom_kml_data, isvisible=[0, 0])
+
+    other_df = df_DBF.loc[df_DBF['CLASS'] == 'OTH']
+    other_list = other_df['Feature'].value_counts(ascending=True)
+    for current_anom_name, row in other_list.items():
+        current_anom_df = df_DBF.loc[df_DBF['Feature'] == current_anom_name]
+        other_kml_data = current_anom_df[["OTH_DESCR", 'LATITUDE', 'LONGITUDE']]
+        toKML.kml_write_others(feature_name=current_anom_name, kml_data=other_kml_data, isvisible=[0, 0])
+
+    construct_df = df_DBF.loc[df_DBF['CLASS'] == 'CON']
+    construct_list = construct_df['Feature'].value_counts(ascending=True)
+    for current_anom_name, row in construct_list.items():
+        current_anom_df = df_DBF.loc[df_DBF['Feature'] == current_anom_name]
+        construct_kml_data = current_anom_df[["OTH_DESCR", 'LATITUDE', 'LONGITUDE']]
+
+        if current_anom_name in ['Задвижка', 'Valve']:
+            isvisible = [1, 0]
+        else:
+            isvisible = [0, 0]
+        toKML.kml_write_construction(feature_name=current_anom_name, kml_data=construct_kml_data, isvisible=isvisible)
+
+    top_df = df_DBF.loc[df_DBF['CLASS'] == 'TOP']
+    top_list = top_df['Feature'].value_counts(ascending=True)
+    for current_anom_name, row in top_list.items():
+        current_anom_df = df_DBF.loc[df_DBF['Feature'] == current_anom_name]
+        top_kml_data = current_anom_df[["OTH_DESCR", 'LATITUDE', 'LONGITUDE']]
+
+        if current_anom_name in ['Шов', 'Weld']:
+            isvisible = [0, 1]
+        else:
+            isvisible = [1, 0]
+        toKML.kml_write_top_lvl(feature_name=current_anom_name, kml_data=top_kml_data, isvisible=isvisible)
+
+    toKML.kml_save("Тест")
 
 
 if __name__ == "__main__":
     main()
-
-# WELDS_ID = [901, 902, 903, 904, 905, 906]
-# ML_ID = [101, 106, 32869, 3581198, 1081016421, 111]
-# GEOM_ID = [201, 202]
-#
-# welds_point_names = []
-# welds_line = []
-# welds_lats = []
-# welds_longs = []
-#
-# ml_point_names = []
-# ml_line = []
-# ml_lats = []
-# ml_longs = []
-#
-# geom_point_names = []
-# geom_lines = []
-# geom_lats = []
-# geom_longs = []
-#
-# SOURCE_NAME = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\1ntom.DBF"
-#
-# extention = SOURCE_NAME[-3:]
-#
-# if extention != 'dbf' and extention != 'DBF':
-#     print("Wrong file Path")
-#     input("Click any key for exit ")
-#     sys.exit()
-#
-# newFormatRECOPY_SOURCE = dbf.Table(SOURCE_NAME, codepage='cp1251', on_disk=True)
-# newFormatRECOPY_SOURCE.open(dbf.READ_WRITE)
-#
-# lang = "EN"
-#
-# bKML = bKML(lang=lang)
-#
-# with newFormatRECOPY_SOURCE:
-#     for record in newFormatRECOPY_SOURCE:
-#
-#         lat = record.LATITUDE
-#         long = record.LONGITUDE
-#         dist = record.FEA_DIST
-#         depth = record.FEA_DEPTH
-#         wt = record.WT
-#
-#         if depth is not None and wt is not None:
-#             depth = round(record.FEA_DEPTH / record.WT * 100, 1)
-#         ml_description = f"Потеря металла, {dist}м, D {depth}%"
-#         geom_description = f"Вмятина, {dist}м, D {depth}%"
-#
-#         if record.FEA_CODE in WELDS_ID:
-#             welds_point_names.append(dist)
-#             welds_longs.append(long)
-#             welds_lats.append(lat)
-#         if record.FEA_CODE in ML_ID:
-#             ml_point_names.append(ml_description)
-#             ml_longs.append(long)
-#             ml_lats.append(lat)
-#         if record.FEA_CODE in GEOM_ID:
-#             geom_point_names.append(dist)
-#             geom_longs.append(long)
-#             geom_lats.append(lat)
-#
-# bKML.kml_write_anomaly(feature_name="Потери металла", kml_data=[ml_point_names, ml_lats, ml_longs],
-#                        isvisible=[1, 0])
-# bKML.kml_write_anomaly(feature_name="Вмятины",
-#                        kml_data=[geom_point_names, geom_lats, geom_longs], isvisible=[1, 0])
-# bKML.kml_write_top_lvl(feature_name="Трубные секции",
-#                        kml_data=[welds_point_names, welds_lats, welds_longs], isvisible=[0, 1])
-#
-# bKML.kml_save("bKML_test")
-#
-# print("~~~Done~~~")
