@@ -47,7 +47,11 @@ def DBFtoKML():
         try:
             print("\nProcessing....")
             DBtoKML.bKML(dbf_path=dbf_path, lang=lng, diameter=diameter).dbf_to_kml()
-            write_log(filepath=dbf_path)
+            try:
+                write_log(filepath=dbf_path)
+            except Exception as logex:
+                print("LOG Error")
+
         except Exception as ex:
             print(ex)
             print("Что-то пошло не так...")
@@ -64,11 +68,23 @@ def openfile():
     textEntry.set(filename)
 
 
+def resource_path(relative_path):
+    try:
+    # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception as ex:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+
 userForm = Tk()
 
 exp_date_formatted = datetime.strptime(EXP_DAY, "%Y-%m-%d").date()
 now_date = date.today()
 days_left = exp_date_formatted - now_date
+
+ico_abs_path = resource_path('KML.ico')
+userForm.wm_iconbitmap(ico_abs_path)
 
 if exp_date_formatted >= now_date:
 
@@ -94,14 +110,23 @@ if exp_date_formatted >= now_date:
     fileButon.pack(side='right')
     # fileButon.place(x=270, y=42)
 
+    blankLabel = Label(userForm, text="          ")
+    blankLabel.pack(side='left');
+
+    inchLabel = Label(userForm, text="Diam")
+    inchLabel.pack(side='left');
+
     diam_list_variable = StringVar(userForm)
     diam_combobox = OptionMenu(userForm, diam_list_variable, *diam_list)
     diam_combobox.pack(side='left')
     diam_list_variable.set(diam_list[4])
 
+
+
     def on_closing():
         userForm.destroy()
         sys.exit()
+
 
     userForm.protocol("WM_DELETE_WINDOW", on_closing)
     userForm.mainloop()

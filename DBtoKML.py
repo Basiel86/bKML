@@ -286,7 +286,7 @@ class bKML:
         for current_anom_name, row in anoms_list.items():
             current_anom_df = df_DBF.loc[df_DBF['Feature'] == current_anom_name]
             anom_kml_data = current_anom_df[["ML_DESCR", 'LATITUDE', 'LONGITUDE', 'FEA_DEPTH_PRC', 'FEA_DIST']]
-            if current_anom_name in ['Потеря металла', ['Metal Loss']]:
+            if current_anom_name in ['Потеря металла', 'Metal Loss']:
                 self.kml_write_ml_subranges(kml_data=anom_kml_data, isvisible=[0, 0])
             else:
                 self.kml_write_anomaly(feature_name=current_anom_name, kml_data=anom_kml_data, isvisible=[0, 0])
