@@ -1,8 +1,18 @@
 import os.path
-
 import pandas as pd
-import numpy as np
+import sys
 from simpledbf import Dbf5
+
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception as ex:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 
 class df_DBF:
@@ -10,7 +20,7 @@ class df_DBF:
 
         self.lng = lang
         self.dbf_path = DBF_path
-        self.index_filename = 'DBF_INDEX.xlsx'
+        self.index_filename = resource_path('DBF_INDEX.xlsx')
 
         self.df_index_fea_code = pd.read_excel(self.index_filename, sheet_name='FEA_CODE')
         self.df_index_har_code1 = pd.read_excel(self.index_filename, sheet_name='HAR_CODE1')
@@ -37,9 +47,11 @@ class df_DBF:
 
         self.df_dbf['WT'] = pd.to_numeric(self.df_dbf['WT'], errors='coerce')
 
-        self.df_dbf.loc[self.df_dbf['FEA_CODE'] == 201, 'FEA_DEPTH_PRC'] = round(
+        ml_list = [101, 106, 32869, 3581198, 1081016421]
+        geom_list = [201, 32969, 52887753]
+        self.df_dbf.loc[self.df_dbf['FEA_CODE'].isin(geom_list), 'FEA_DEPTH_PRC'] = round(
             self.df_dbf['FEA_DEPTH'] / diameter * 100, 1)
-        self.df_dbf.loc[self.df_dbf['FEA_CODE'] == 101, 'FEA_DEPTH_PRC'] = round(
+        self.df_dbf.loc[self.df_dbf['FEA_CODE'].isin(ml_list), 'FEA_DEPTH_PRC'] = round(
             self.df_dbf['FEA_DEPTH'] / self.df_dbf['WT'] * 100, 1)
         self.df_dbf.loc[self.df_dbf['FEA_DEPTH_PRC'] < 0, 'FEA_DEPTH_PRC'] = 1
 

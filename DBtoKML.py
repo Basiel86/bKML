@@ -2,7 +2,6 @@ import simplekml
 import DF_DBF
 import os
 
-
 def get_pname_lname(lang="EN"):
     if lang == "RU":
         pname = "Точки"
@@ -123,6 +122,8 @@ class bKML:
 
     def kml_write_ml_subranges(self, kml_data, isvisible=None):
 
+        max_group_count = 5000
+
         self.kml_make_anomalies_folder()
         self.kml_make_ml_subranges_folder()
 
@@ -134,22 +135,32 @@ class bKML:
         point_visibility = isvisible[0]
         feature_line = ([])
 
+        kml_data = kml_data.loc[kml_data['FEA_DEPTH_PRC'] != ""].copy(deep=True)
+
         for i in range(8):
             min_depth = i * 10
             max_depth = (i + 1) * 10
 
             current_range_df = kml_data[kml_data['FEA_DEPTH_PRC'].between(min_depth, max_depth, inclusive="right")]
 
-            if len(current_range_df) > 0:
-                tmp_folder = self.ml_subranges_folder.newfolder(name=f'{i * 10}-{i * 10 + 10}%')
-                tmp_points_folder = tmp_folder.newfolder(name=pname)
-                for elem_id in range(len(current_range_df)):
-                    current_coord = [(current_range_df.iloc[elem_id, 2], current_range_df.iloc[elem_id, 1])]
-                    feature_line.append((current_range_df.iloc[elem_id, 2], current_range_df.iloc[elem_id, 1]))
-                    point = tmp_points_folder.newpoint(name=current_range_df.iloc[elem_id, 0], coords=current_coord,
-                                                       visibility=point_visibility)
-                    point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_square.png'
-                    point.style.labelstyle.scale = 0.9
+            if len(current_range_df) < max_group_count:
+
+            # вытаскивание 5000 глубочайших в серии
+            #     current_range_df = current_range_df.sort_values('FEA_DEPTH_PRC')
+            #     current_range_df = current_range_df.iloc[0:max_group_count]#.copy(deep=True)
+            #     current_range_df = current_range_df.sort_values('FEA_DIST')
+            # print(f'{min_depth}-{max_depth} count: {len(current_range_df)}')
+
+                if len(current_range_df) > 0:
+                    tmp_folder = self.ml_subranges_folder.newfolder(name=f'{i * 10}-{i * 10 + 10}%')
+                    tmp_points_folder = tmp_folder.newfolder(name=pname)
+                    for elem_id in range(len(current_range_df)):
+                        current_coord = [(current_range_df.iloc[elem_id, 2], current_range_df.iloc[elem_id, 1])]
+                        feature_line.append((current_range_df.iloc[elem_id, 2], current_range_df.iloc[elem_id, 1]))
+                        point = tmp_points_folder.newpoint(name=current_range_df.iloc[elem_id, 0], coords=current_coord,
+                                                           visibility=point_visibility)
+                        point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_square.png'
+                        point.style.labelstyle.scale = 0.9
 
     def kml_write_construction(self, feature_name, kml_data, isvisible=None):
 
@@ -274,7 +285,7 @@ class bKML:
         anoms_list = anoms_df['Feature'].value_counts(ascending=True)
         for current_anom_name, row in anoms_list.items():
             current_anom_df = df_DBF.loc[df_DBF['Feature'] == current_anom_name]
-            anom_kml_data = current_anom_df[["ML_DESCR", 'LATITUDE', 'LONGITUDE', 'FEA_DEPTH_PRC']]
+            anom_kml_data = current_anom_df[["ML_DESCR", 'LATITUDE', 'LONGITUDE', 'FEA_DEPTH_PRC', 'FEA_DIST']]
             if current_anom_name in ['Потеря металла', ['Metal Loss']]:
                 self.kml_write_ml_subranges(kml_data=anom_kml_data, isvisible=[0, 0])
             else:
@@ -320,14 +331,19 @@ class bKML:
         self.kml_save(exportpath)
 
         no_coord_records = len(df_DBF_raw) - len(df_DBF)
+        print("\n~~~Done~~~")
+        print(f"Обработано записей: {len(df_DBF_raw)}")
         if no_coord_records > 0:
             print("Записей без координат: ", no_coord_records)
+        #print(f"KML создана по {len(df_DBF)} записям"'\n')
 
 
 def main():
     lang = 'RU'
     path = input("Enter DBF path: ")
     diameter = float(input("Enter Diameter: "))
+
+    #bKML(dbf_path=path, lang=lang, diameter=diameter).dbf_to_kml()
 
     try:
         bKML(dbf_path=path, lang=lang, diameter=diameter).dbf_to_kml()
