@@ -27,6 +27,14 @@ class df_DBF:
         self.df_index_har_code2 = pd.read_excel(self.index_filename, sheet_name='HAR_CODE2')
         self.df_index_fea_type = pd.read_excel(self.index_filename, sheet_name='FEA_TYPE')
 
+        self.ml_list = [101, 106, 32869, 3581198, 1081016421]
+        self.geom_list = [201, 32969, 52887753]
+
+        # FEA_RU
+        # TYPE_RU
+        # FEA_EN
+        # TYPE_EN
+
         dbf_raw = Dbf5(self.dbf_path, codec='cp1251')
         self.df_dbf = dbf_raw.to_dataframe()
         self.df_dbf['Feature'] = self.df_dbf['FEA_CODE']
@@ -47,11 +55,9 @@ class df_DBF:
 
         self.df_dbf['WT'] = pd.to_numeric(self.df_dbf['WT'], errors='coerce')
 
-        ml_list = [101, 106, 32869, 3581198, 1081016421]
-        geom_list = [201, 32969, 52887753]
-        self.df_dbf.loc[self.df_dbf['FEA_CODE'].isin(geom_list), 'FEA_DEPTH_PRC'] = round(
+        self.df_dbf.loc[self.df_dbf['FEA_CODE'].isin(self.geom_list), 'FEA_DEPTH_PRC'] = round(
             self.df_dbf['FEA_DEPTH'] / diameter * 100, 1)
-        self.df_dbf.loc[self.df_dbf['FEA_CODE'].isin(ml_list), 'FEA_DEPTH_PRC'] = round(
+        self.df_dbf.loc[self.df_dbf['FEA_CODE'].isin(self.ml_list), 'FEA_DEPTH_PRC'] = round(
             self.df_dbf['FEA_DEPTH'] / self.df_dbf['WT'] * 100, 1)
         self.df_dbf.loc[self.df_dbf['FEA_DEPTH_PRC'] < 0, 'FEA_DEPTH_PRC'] = 1
 
@@ -74,12 +80,13 @@ class df_DBF:
 
 
 if __name__ == '__main__':
-    path = input("DBF path: ")
-    diam = input("INCH?: ")
-    lang = input("'1' for EN?: ") 
+    #path = input("DBF path: ")
+    #diam = input("INCH?: ")
+    # lang = input("'1' for EN?: ")
 
-    # path = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\1nldm_24_05_GPS.DBF"
-    # diam = 10.75
+    path = r"WORK_DBF\1nhdm.DBF"
+    diam = 10.75
+    lang = 'RU'
     if diam == '':
         diam = 1
     else:
