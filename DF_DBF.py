@@ -76,6 +76,7 @@ class df_DBF:
 if __name__ == '__main__':
     path = input("DBF path: ")
     diam = input("INCH?: ")
+    lang = input("'1' for EN?: ") 
 
     # path = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\1nldm_24_05_GPS.DBF"
     # diam = 10.75
@@ -86,15 +87,19 @@ if __name__ == '__main__':
 
     if diam < 100:
         diam = diam * 25.4
+        
+    if lang == '1':
+        lang = "EN"
+    else:
+        lang = "RU"
 
-    df_dbf = df_DBF(DBF_path=path)
+    df_dbf = df_DBF(DBF_path=path, lang = lang)
     exp = df_dbf.convert_dbf(diameter=diam)
 
     exp_format = ['SECT_NUM', 'FEA_NUM', 'FEA_DIST', 'REL_DIST', 'DOC', 'Feature', 'HAR_CODE1', 'HAR_CODE2', 'COMMENT',
-                  'REMARKS', 'ERF',
+                  'REMARKS', 'ERF', 'CLUST_NUM',
                   'MAOP', 'WT', 'FEA_DEPTH', 'FEA_DEPTH_PRC', 'AMPL_MFL', 'DEPTH_PREV', 'DEPTH_TMP', 'DEPTH_TMP2',
-                  'FEA_LENGTH', 'FEA_WIDTH', 'CLCK_DP', 'FEA_TYPE', 'REP_GROUP', 'LATITUDE', 'LONGITUDE', 'HEIGHT',
-                  'CLASS']
+                  'FEA_LENGTH', 'FEA_WIDTH', 'CLCK_DP', 'FEA_TYPE', 'REP_GROUP', 'LATITUDE', 'LONGITUDE', 'HEIGHT']
 
     total_coluns = exp.columns.values.tolist()
     cross_columns = []

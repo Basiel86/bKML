@@ -2,6 +2,7 @@ import simplekml
 import DF_DBF
 import os
 
+
 def get_pname_lname(lang="EN"):
     if lang == "RU":
         pname = "Точки"
@@ -30,6 +31,8 @@ class bKML:
         self.ml_subranges_folder_exists = False
         self.is_constructions_folder_exists = False
         self.is_others_folder_exists = False
+
+        self.ml_icon_path = self.kml.addfile("icons/ML.png")
 
     def kml_make_anomalies_folder(self):
 
@@ -88,7 +91,8 @@ class bKML:
             self.kml_others_folder = self.kml.newfolder(name=fname)
 
     def kml_save(self, kml_name):
-        self.kml.save(f"{kml_name}.kml")
+        #self.kml.save(f"{kml_name}.kml")
+        self.kml.savekmz(f"{kml_name}.kmz")
 
     def kml_write_anomaly(self, feature_name, kml_data, isvisible=None):
 
@@ -145,11 +149,11 @@ class bKML:
 
             if len(current_range_df) < max_group_count:
 
-            # вытаскивание 5000 глубочайших в серии
-            #     current_range_df = current_range_df.sort_values('FEA_DEPTH_PRC')
-            #     current_range_df = current_range_df.iloc[0:max_group_count]#.copy(deep=True)
-            #     current_range_df = current_range_df.sort_values('FEA_DIST')
-            # print(f'{min_depth}-{max_depth} count: {len(current_range_df)}')
+                # вытаскивание 5000 глубочайших в серии
+                #     current_range_df = current_range_df.sort_values('FEA_DEPTH_PRC')
+                #     current_range_df = current_range_df.iloc[0:max_group_count]#.copy(deep=True)
+                #     current_range_df = current_range_df.sort_values('FEA_DIST')
+                # print(f'{min_depth}-{max_depth} count: {len(current_range_df)}')
 
                 if len(current_range_df) > 0:
                     tmp_folder = self.ml_subranges_folder.newfolder(name=f'{i * 10}-{i * 10 + 10}%')
@@ -159,7 +163,12 @@ class bKML:
                         feature_line.append((current_range_df.iloc[elem_id, 2], current_range_df.iloc[elem_id, 1]))
                         point = tmp_points_folder.newpoint(name=current_range_df.iloc[elem_id, 0], coords=current_coord,
                                                            visibility=point_visibility)
-                        point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_square.png'
+
+                        point.style.iconstyle.icon.href = self.ml_icon_path
+                        #pnt.description = '<img src="' + path + '" alt="picture" width="400" height="300" align="left" />'
+
+
+                        #point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_square.png'
                         point.style.labelstyle.scale = 0.9
 
     def kml_write_construction(self, feature_name, kml_data, isvisible=None):
@@ -279,7 +288,8 @@ class bKML:
             'Feature']
 
         # описание для всего остального
-        df_DBF['OTH_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + df_DBF['Feature'] + ' ' + df_DBF['COMMENT']
+        df_DBF['OTH_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + df_DBF['Feature'] + ' ' + df_DBF[
+            'HAR_CODE1'].astype(str) + ' ' + df_DBF['COMMENT']
 
         anoms_df = df_DBF.loc[df_DBF['CLASS'] == 'ANOM']
         anoms_list = anoms_df['Feature'].value_counts(ascending=True)
@@ -335,7 +345,7 @@ class bKML:
         print(f"Обработано записей: {len(df_DBF_raw)}")
         if no_coord_records > 0:
             print("Записей без координат: ", no_coord_records)
-        #print(f"KML создана по {len(df_DBF)} записям"'\n')
+        # print(f"KML создана по {len(df_DBF)} записям"'\n')
 
 
 def main():
@@ -343,7 +353,7 @@ def main():
     path = input("Enter DBF path: ")
     diameter = float(input("Enter Diameter: "))
 
-    #bKML(dbf_path=path, lang=lang, diameter=diameter).dbf_to_kml()
+    # bKML(dbf_path=path, lang=lang, diameter=diameter).dbf_to_kml()
 
     try:
         bKML(dbf_path=path, lang=lang, diameter=diameter).dbf_to_kml()
