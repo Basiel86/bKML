@@ -2,6 +2,20 @@ import simplekml
 import DF_DBF
 import os
 
+ml_range_colors = {'0-10': [99, 190, 123],
+                   '10-20': [138, 201, 125],
+                   '20-30': [177, 212, 127],
+                   '30-40': [216, 223, 129],
+                   '40-50': [255, 235, 132],
+                   '50-60': [254, 203, 126],
+                   '60-70': [252, 170, 120],
+                   '70-80': [250, 138, 114],
+                   '80-100': [248, 105, 107]}
+
+
+def list_to_rgb(rgb_list):
+    return rgb_list[0], rgb_list[1], rgb_list[2]
+
 
 def get_pname_lname(lang="EN"):
     if lang == "RU":
@@ -32,7 +46,7 @@ class bKML:
         self.is_constructions_folder_exists = False
         self.is_others_folder_exists = False
 
-        self.ml_icon_path = self.kml.addfile("icons/ML.png")
+        # self.ml_icon_path = self.kml.addfile(r'icons\ML.png')
 
     def kml_make_anomalies_folder(self):
 
@@ -91,7 +105,7 @@ class bKML:
             self.kml_others_folder = self.kml.newfolder(name=fname)
 
     def kml_save(self, kml_name):
-        #self.kml.save(f"{kml_name}.kml")
+        # self.kml.save(f"{kml_name}.kml")
         self.kml.savekmz(f"{kml_name}.kmz")
 
     def kml_write_anomaly(self, feature_name, kml_data, isvisible=None):
@@ -144,6 +158,7 @@ class bKML:
         for i in range(8):
             min_depth = i * 10
             max_depth = (i + 1) * 10
+            ml_range = str(min_depth) + "-" + str(max_depth)
 
             current_range_df = kml_data[kml_data['FEA_DEPTH_PRC'].between(min_depth, max_depth, inclusive="right")]
 
@@ -164,11 +179,14 @@ class bKML:
                         point = tmp_points_folder.newpoint(name=current_range_df.iloc[elem_id, 0], coords=current_coord,
                                                            visibility=point_visibility)
 
-                        point.style.iconstyle.icon.href = self.ml_icon_path
-                        #pnt.description = '<img src="' + path + '" alt="picture" width="400" height="300" align="left" />'
+                        point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes' \
+                                                          '/placemark_circle.png '
 
+                        r, g, b = list_to_rgb(ml_range_colors[ml_range])
+                        point.style.iconstyle.color = simplekml.Color.rgb(r, g, b)
+                        # pnt.description = '<img src="' + path + '" alt="picture" width="400" height="300" align="left" />'
 
-                        #point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_square.png'
+                        # point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_square.png'
                         point.style.labelstyle.scale = 0.9
 
     def kml_write_construction(self, feature_name, kml_data, isvisible=None):
@@ -283,18 +301,18 @@ class bKML:
         # формируем описание для потерей
         df_DBF['ML_DESCR'] = ''
         df_DBF.loc[df_DBF['FEA_DEPTH_PRC'] != "", 'ML_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + df_DBF[
-            'Feature'] + ' ' + df_DBF['FEA_DEPTH_PRC'].astype(str) + '%'
+            'FEA_CODE_REPLACE'] + ' ' + df_DBF['FEA_DEPTH_PRC'].astype(str) + '%'
         df_DBF.loc[df_DBF['FEA_DEPTH_PRC'] == "", 'ML_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + df_DBF[
-            'Feature']
+            'FEA_CODE_REPLACE']
 
         # описание для всего остального
-        df_DBF['OTH_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + df_DBF['Feature'] + ' ' + df_DBF[
+        df_DBF['OTH_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + df_DBF['FEA_CODE_REPLACE'] + ' ' + df_DBF[
             'HAR_CODE1'].astype(str) + ' ' + df_DBF['COMMENT']
 
         anoms_df = df_DBF.loc[df_DBF['CLASS'] == 'ANOM']
-        anoms_list = anoms_df['Feature'].value_counts(ascending=True)
+        anoms_list = anoms_df['FEA_CODE_REPLACE'].value_counts(ascending=True)
         for current_anom_name, row in anoms_list.items():
-            current_anom_df = df_DBF.loc[df_DBF['Feature'] == current_anom_name]
+            current_anom_df = df_DBF.loc[df_DBF['FEA_CODE_REPLACE'] == current_anom_name]
             anom_kml_data = current_anom_df[["ML_DESCR", 'LATITUDE', 'LONGITUDE', 'FEA_DEPTH_PRC', 'FEA_DIST']]
             if current_anom_name in ['Потеря металла', 'Metal Loss']:
                 self.kml_write_ml_subranges(kml_data=anom_kml_data, isvisible=[0, 0])
@@ -302,16 +320,16 @@ class bKML:
                 self.kml_write_anomaly(feature_name=current_anom_name, kml_data=anom_kml_data, isvisible=[0, 0])
 
         other_df = df_DBF.loc[df_DBF['CLASS'] == 'OTH']
-        other_list = other_df['Feature'].value_counts(ascending=True)
+        other_list = other_df['FEA_CODE_REPLACE'].value_counts(ascending=True)
         for current_anom_name, row in other_list.items():
-            current_anom_df = df_DBF.loc[df_DBF['Feature'] == current_anom_name]
+            current_anom_df = df_DBF.loc[df_DBF['FEA_CODE_REPLACE'] == current_anom_name]
             other_kml_data = current_anom_df[["OTH_DESCR", 'LATITUDE', 'LONGITUDE']]
             self.kml_write_others(feature_name=current_anom_name, kml_data=other_kml_data, isvisible=[0, 0])
 
         construct_df = df_DBF.loc[df_DBF['CLASS'] == 'CON']
-        construct_list = construct_df['Feature'].value_counts(ascending=True)
+        construct_list = construct_df['FEA_CODE_REPLACE'].value_counts(ascending=True)
         for current_anom_name, row in construct_list.items():
-            current_anom_df = df_DBF.loc[df_DBF['Feature'] == current_anom_name]
+            current_anom_df = df_DBF.loc[df_DBF['FEA_CODE_REPLACE'] == current_anom_name]
             construct_kml_data = current_anom_df[["OTH_DESCR", 'LATITUDE', 'LONGITUDE']]
 
             if current_anom_name in ['Задвижка', 'Valve']:
@@ -322,9 +340,9 @@ class bKML:
                                         isvisible=isvisible)
 
         top_df = df_DBF.loc[df_DBF['CLASS'] == 'TOP']
-        top_list = top_df['Feature'].value_counts(ascending=True)
+        top_list = top_df['FEA_CODE_REPLACE'].value_counts(ascending=True)
         for current_anom_name, row in top_list.items():
-            current_anom_df = df_DBF.loc[df_DBF['Feature'] == current_anom_name]
+            current_anom_df = df_DBF.loc[df_DBF['FEA_CODE_REPLACE'] == current_anom_name]
             top_kml_data = current_anom_df[["OTH_DESCR", 'LATITUDE', 'LONGITUDE']]
 
             if current_anom_name in ['Шов', 'Weld']:

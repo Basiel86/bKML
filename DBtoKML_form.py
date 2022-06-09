@@ -33,7 +33,7 @@ def write_log(filepath=""):
                        f'{filepath}\n')
         log_file.close()
     except Exception as ex:
-        print("Log export error: ", ex)
+        print("LOG Error: ", ex)
 
 
 def DBFtoKML():
@@ -56,7 +56,7 @@ def DBFtoKML():
             print(ex)
             print("Что-то пошло не так...")
     else:
-        print("Путь не верен, ты сбился с пути, друг?")
+        print("Путь не верен! Ты сбился с пути!?")
 
 
 def openfile():
@@ -70,7 +70,7 @@ def openfile():
 
 def resource_path(relative_path):
     try:
-    # PyInstaller creates a temp folder and stores path in _MEIPASS
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
     except Exception as ex:
         base_path = os.path.abspath(".")
@@ -78,6 +78,11 @@ def resource_path(relative_path):
 
 
 userForm = Tk()
+
+# читаем аргументы на входе
+arg = ''
+for arg in sys.argv[1:]:
+    print('Drag&Drop file: ', arg)
 
 exp_date_formatted = datetime.strptime(EXP_DAY, "%Y-%m-%d").date()
 now_date = date.today()
@@ -97,6 +102,9 @@ if exp_date_formatted >= now_date:
     textEntry = StringVar(userForm)
     myTextbox = Entry(userForm, width=580, textvariable=textEntry)
     myTextbox.pack();
+
+    if arg != '':
+        textEntry.set(arg)
 
     myButon = Button(userForm, text="DBF to KML", command=DBFtoKML)
     myButon.pack(side='left')
@@ -120,7 +128,6 @@ if exp_date_formatted >= now_date:
     diam_combobox = OptionMenu(userForm, diam_list_variable, *diam_list)
     diam_combobox.pack(side='left')
     diam_list_variable.set(diam_list[4])
-
 
 
     def on_closing():

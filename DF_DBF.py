@@ -2,6 +2,12 @@ import os.path
 import pandas as pd
 import sys
 from simpledbf import Dbf5
+from parse_inch import parse_inch
+
+"""
+    FEA_CODE_REPLACE - столбец прямой конверсии
+
+"""
 
 
 def resource_path(relative_path):
@@ -22,6 +28,7 @@ class df_DBF:
         self.dbf_path = DBF_path
         self.index_filename = resource_path('DBF_INDEX.xlsx')
 
+        # Списки из Экселя
         self.df_index_fea_code = pd.read_excel(self.index_filename, sheet_name='FEA_CODE')
         self.df_index_har_code1 = pd.read_excel(self.index_filename, sheet_name='HAR_CODE1')
         self.df_index_har_code2 = pd.read_excel(self.index_filename, sheet_name='HAR_CODE2')
@@ -37,18 +44,23 @@ class df_DBF:
 
         dbf_raw = Dbf5(self.dbf_path, codec='cp1251')
         self.df_dbf = dbf_raw.to_dataframe()
-        self.df_dbf['Feature'] = self.df_dbf['FEA_CODE']
+        self.df_dbf['FEA_CODE_REPLACE'] = self.df_dbf['FEA_CODE']
         self.df_dbf['CLASS'] = self.df_dbf['FEA_CODE']
+        self.df_dbf['FEATURE'] = ''
+        self.df_dbf['F_TYPE'] = ''
 
     def convert_dbf(self, diameter):
 
-        self.df_replace(self.df_index_fea_code, "Feature", change_class=True)
+        if diameter < 100:
+            diameter = diameter * 25.4
+
+        self.df_replace(self.df_index_fea_code, "FEA_CODE_REPLACE", change_class=True)
         self.df_replace(self.df_index_har_code1, "HAR_CODE1")
         self.df_replace(self.df_index_har_code2, "HAR_CODE2")
         self.df_replace(self.df_index_fea_type, "FEA_TYPE")
+        # self.fea_type_parse()
 
         self.df_dbf = self.df_dbf.sort_values('FEA_DIST')
-
         self.df_dbf['FEA_DEPTH'] = pd.to_numeric(self.df_dbf['FEA_DEPTH'], errors='coerce')
 
         # https://stackoverflow.com/questions/25952790/convert-pandas-series-from-dtype-object-to-float-and-errors-to-nans
@@ -78,51 +90,87 @@ class df_DBF:
                     self.df_dbf.loc[self.df_dbf['CLASS'] == f_ID, 'CLASS'] = f_ID_CLASS
         # print("Replace ", replace_column_name, " done")
 
+    def fea_type_parse(self):
+
+        for elem_id in range(len(self.df_dbf)):
+            current_fea_code = self.df_dbf.loc[elem_id, 'FEA_CODE']
+            if current_fea_code in self.df_index_fea_code.loc[elem_id]['ID']:
+                print('match')
+
 
 if __name__ == '__main__':
-    #path = input("DBF path: ")
-    #diam = input("INCH?: ")
-    # lang = input("'1' for EN?: ")
 
-    path = r"WORK_DBF\1nhdm.DBF"
-    diam = 10.75
-    lang = 'RU'
-    if diam == '':
-        diam = 1
+    arg = ''
+    for arg in sys.argv[1:]:
+        print(arg)
+
+    if arg != '':
+        path = arg
     else:
-        diam = float(diam)
+        path = input("DBF path: ")
 
-    if diam < 100:
-        diam = diam * 25.4
-        
-    if lang == '1':
-        lang = "EN"
+    if path[-3:] != 'DBF' and path[-3:] != 'dbf':
+        input("Error: not DBF link")
     else:
-        lang = "RU"
+        diam = parse_inch(path)
+        if diam is not None:
+            print('Detected Diam: ', diam, " inch")
+        else:
+            diam = input("INCH?: ")
 
-    df_dbf = df_DBF(DBF_path=path, lang = lang)
-    exp = df_dbf.convert_dbf(diameter=diam)
+        if arg == '':
+            lang = input("'1' for EN?: ")
+        else:
+            lang = "RU"
 
-    exp_format = ['SECT_NUM', 'FEA_NUM', 'FEA_DIST', 'REL_DIST', 'DOC', 'Feature', 'HAR_CODE1', 'HAR_CODE2', 'COMMENT',
-                  'REMARKS', 'ERF', 'CLUST_NUM',
-                  'MAOP', 'WT', 'FEA_DEPTH', 'FEA_DEPTH_PRC', 'AMPL_MFL', 'DEPTH_PREV', 'DEPTH_TMP', 'DEPTH_TMP2',
-                  'FEA_LENGTH', 'FEA_WIDTH', 'CLCK_DP', 'FEA_TYPE', 'REP_GROUP', 'LATITUDE', 'LONGITUDE', 'HEIGHT']
+        # path = r"WORK_DBF\1nhdm.DBF"
+        # diam = 10.75
+        # lang = 'RU'
+        if diam == '':
+            diam = 1
+        else:
+            diam = float(diam)
 
-    total_coluns = exp.columns.values.tolist()
-    cross_columns = []
-    for val in exp_format:
-        for val2 in total_coluns:
-            if val == val2:
-                cross_columns.append(val)
+        if diam < 100:
+            diam = diam * 25.4
 
-    # print(cross_columns)
+        if lang == '1':
+            lang = "EN"
+        else:
+            lang = "RU"
 
-    exp1 = exp[cross_columns]
+        print('\nProcess...\n')
+        df_dbf = df_DBF(DBF_path=path, lang=lang)
+        exp = df_dbf.convert_dbf(diameter=diam)
 
-    absbath = os.path.dirname(path)
-    basename = os.path.basename(path)
-    exportpath = os.path.join(absbath, basename)
-    exportpath = f'{exportpath[:-4]}.csv'
-    exp1.to_csv(exportpath, encoding='cp1251', index=False)
-    print(exportpath)
-    input("~~~ Done~~~")
+        exp_format = ['SECT_NUM', 'FEA_NUM', 'FEA_DIST', 'REL_DIST', 'DOC', 'FEA_CODE_REPLACE', 'HAR_CODE1',
+                      'HAR_CODE2',
+                      'COMMENT',
+                      'REMARKS', 'ERF', 'CLUST_NUM',
+                      'MAOP', 'WT', 'FEA_DEPTH', 'FEA_DEPTH_PRC', 'AMPL_MFL', 'DEPTH_PREV', 'DEPTH_TMP', 'DEPTH_TMP2',
+                      'FEA_LENGTH', 'FEA_WIDTH', 'CLCK_DP', 'FEA_TYPE', 'REP_GROUP', 'LATITUDE', 'LONGITUDE', 'HEIGHT']
+
+        total_coluns = exp.columns.values.tolist()
+        cross_columns = []
+        for val in exp_format:
+            for val2 in total_coluns:
+                if val == val2:
+                    cross_columns.append(val)
+
+        # print(cross_columns)
+
+        exp1 = exp[cross_columns]
+
+        absbath = os.path.dirname(path)
+        basename = os.path.basename(path)
+        exportpath = os.path.join(absbath, basename)
+        exportpath = f'{exportpath[:-4]}.csv'
+        try:
+            exp1.to_csv(exportpath, encoding='cp1251', index=False)
+        except Exception as PermissionError:
+            print(f"'{basename[:-4]}.csv' is opened, saved as '{basename[:-4]}_1.csv'")
+            exportpath = os.path.join(absbath, basename)
+            exportpath = f'{exportpath[:-4]}_1.csv'
+            exp1.to_csv(exportpath, encoding='cp1251', index=False)
+
+        input("~~~ Done~~~")
