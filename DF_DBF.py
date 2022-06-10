@@ -47,7 +47,7 @@ class df_DBF:
         self.df_dbf['FEA_CODE_REPLACE'] = self.df_dbf['FEA_CODE']
         self.df_dbf['CLASS'] = self.df_dbf['FEA_CODE']
         self.df_dbf['FEATURE'] = ''
-        self.df_dbf['F_TYPE'] = ''
+        self.df_dbf['FEATURE_TYPE'] = ''
 
     def convert_dbf(self, diameter):
 
@@ -92,10 +92,14 @@ class df_DBF:
 
     def fea_type_parse(self):
 
-        for elem_id in range(len(self.df_dbf)):
-            current_fea_code = self.df_dbf.loc[elem_id, 'FEA_CODE']
-            if current_fea_code in self.df_index_fea_code.loc[elem_id]['ID']:
-                print('match')
+        id_list = self.df_index_fea_code['ID']
+
+        for i, row in self.df_dbf.iterrows():
+            ind = self.df_dbf.loc[i]['FEA_CODE']
+            if not id_list[id_list.isin([ind])].empty:
+                ID_ROW = self.df_index_fea_code.loc[self.df_index_fea_code['ID'] == ind]
+                self.df_dbf.loc[i]['FEATURE'] = ID_ROW.loc[1]['FEA_RU']
+                self.df_dbf.loc[i]['FEATURE_TYPE'] = ID_ROW.loc[1]['TYPE_RU']
 
 
 if __name__ == '__main__':
