@@ -4,7 +4,7 @@ import DBtoKML
 from tkinter import filedialog as fd
 from datetime import datetime, date
 
-EXP_DAY = '2022-06-30'
+EXP_DAY = '2022-07-30'
 
 lng_list = ["RU", "EN"]
 dbf_ext_list = ['dbf', 'DBF']

@@ -300,14 +300,16 @@ class bKML:
 
         # формируем описание для потерей
         df_DBF['ML_DESCR'] = ''
-        df_DBF.loc[df_DBF['FEA_DEPTH_PRC'] != "", 'ML_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + df_DBF[
-            'FEA_CODE_REPLACE'] + ' ' + df_DBF['FEA_DEPTH_PRC'].astype(str) + '%'
-        df_DBF.loc[df_DBF['FEA_DEPTH_PRC'] == "", 'ML_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + df_DBF[
-            'FEA_CODE_REPLACE']
+        df_DBF.loc[df_DBF['FEA_DEPTH_PRC'] != "", 'ML_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + \
+                                                                df_DBF['FEA_CODE_REPLACE'].astype(str) + ' ' + \
+                                                                df_DBF['FEA_DEPTH_PRC'].astype(str) + '%'
+        df_DBF.loc[df_DBF['FEA_DEPTH_PRC'] == "", 'ML_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + \
+                                                                df_DBF['FEA_CODE_REPLACE'].astype(str)
 
         # описание для всего остального
-        df_DBF['OTH_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + df_DBF['FEA_CODE_REPLACE'] + ' ' + df_DBF[
-            'HAR_CODE1'].astype(str) + ' ' + df_DBF['COMMENT']
+        df_DBF['OTH_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + df_DBF['FEA_CODE_REPLACE'].astype(str) + ' ' + \
+                              df_DBF['HAR_CODE1'].astype(str) + ' ' + \
+                              df_DBF['COMMENT'].astype(str)
 
         anoms_df = df_DBF.loc[df_DBF['CLASS'] == 'ANOM']
         anoms_list = anoms_df['FEA_CODE_REPLACE'].value_counts(ascending=True)
