@@ -47,11 +47,20 @@ class df_DBF:
         dbf_raw = Dbf5(self.dbf_path, codec='cp1251')
         self.df_dbf = dbf_raw.to_dataframe()
         self.df_dbf['FEA_CODE_REPLACE'] = self.df_dbf['FEA_CODE']
-        self.df_dbf['CLASS'] = self.df_dbf['FEA_CODE']
+        self.df_dbf['KML_CLASS'] = self.df_dbf['FEA_CODE']
         self.df_dbf['FEATURE'] = ''
         self.df_dbf['FEATURE_TYPE'] = ''
         self.df_dbf['JL'] = ''
         self.df_dbf['DIMM'] = ''
+
+    def get_ml_list(self):
+        return self.ml_list
+
+    def get_geom_list(self):
+        return self.geom_list
+
+    def get_welds_list(self):
+        return self.welds_list
 
     def convert_dbf(self, diameter):
 
@@ -68,6 +77,8 @@ class df_DBF:
         self.df_dbf = self.df_dbf.sort_values('FEA_DIST')
         # конвертирование Глубины в числа
         self.df_dbf['FEA_DEPTH'] = pd.to_numeric(self.df_dbf['FEA_DEPTH'], errors='coerce')
+        # конвертирование Номера особенности в числа
+        self.df_dbf['FEA_NUM'] = self.df_dbf['FEA_NUM'].fillna(-1111111).astype(int)
 
         # https://stackoverflow.com/questions/25952790/convert-pandas-series-from-dtype-object-to-float-and-errors-to-nans
 
@@ -99,12 +110,16 @@ class df_DBF:
                self.df_dbf.FEA_WIDTH.notnull() & \
                self.df_dbf.WT.notnull()
 
-        self.df_dbf['DIMM'] = self.df_dbf[mask].apply(
-            lambda row: dimm(length=row['FEA_LENGTH'], width=row['FEA_WIDTH'], wt=row['WT'], return_format=self.lng), axis=1)
+        try:
+            self.df_dbf['DIMM'] = self.df_dbf[mask].apply(
+                lambda row: dimm(length=row['FEA_LENGTH'], width=row['FEA_WIDTH'], wt=row['WT'],
+                                 return_format=self.lng), axis=1)
+        except Exception as ex:
+            print('no ML for Dimm:', ex)
 
         # print(self.df_dbf['DIMM'])
 
-        self.df_dbf = self.df_dbf.replace({'nan': '', 'NaN': '', float('NaN'): ''})
+        self.df_dbf = self.df_dbf.replace({'nan': '', 'NaN': '', float('NaN'): '', -1111111: ''})
 
         return self.df_dbf
 
@@ -117,8 +132,8 @@ class df_DBF:
                 # print(i, " - ", f_ID, " - ", f_ID_DSCR)
                 self.df_dbf.loc[self.df_dbf[replace_column_name] == f_ID, replace_column_name] = f_ID_DSCR
                 if change_class is True:
-                    f_ID_CLASS = str(df_what.loc[i]['CLASS'])
-                    self.df_dbf.loc[self.df_dbf['CLASS'] == f_ID, 'CLASS'] = f_ID_CLASS
+                    f_ID_CLASS = str(df_what.loc[i]['KML_CLASS'])
+                    self.df_dbf.loc[self.df_dbf['KML_CLASS'] == f_ID, 'KML_CLASS'] = f_ID_CLASS
         # print("Replace ", replace_column_name, " done")
 
     def fea_type_parse(self):
@@ -164,7 +179,7 @@ if __name__ == '__main__':
             if arg == '':
                 lang = input("'1' for EN?: ")
             else:
-                lang = "RU"
+                lang = "EN"
 
             # path = r"WORK_DBF\1nhdm.DBF"
             # diam = 10.75

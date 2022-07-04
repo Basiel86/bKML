@@ -12,6 +12,9 @@ ml_range_colors = {'0-10': [99, 190, 123],
                    '70-80': [250, 138, 114],
                    '80-100': [248, 105, 107]}
 
+meter_lang = {'RU': 'м., ',
+              'EN': 'm., '}
+
 
 def list_to_rgb(rgb_list):
     return rgb_list[0], rgb_list[1], rgb_list[2]
@@ -54,10 +57,8 @@ class bKML:
             self.is_anomalies_folder_exists = True
             if self.lang == "RU":
                 fname = "Аномалии"
-                pname, lname = get_pname_lname(self.lang)
             else:
                 fname = "Anomalies"
-                pname, lname = get_pname_lname(self.lang)
 
             self.kml_anomalies_folder = self.kml.newfolder(name=fname)
 
@@ -68,11 +69,9 @@ class bKML:
             if self.lang == "RU":
                 fname = "Диапазоны глубин"
                 ml_fname = "Потеря металла"
-                pname, lname = get_pname_lname(self.lang)
             else:
                 fname = "Depth ranges"
                 ml_fname = "Metal Loss"
-                pname, lname = get_pname_lname(self.lang)
 
             self.ml_folder = self.kml_anomalies_folder.newdocument(name=ml_fname)
             self.ml_subranges_folder = self.ml_folder.newfolder(name=fname)
@@ -83,10 +82,8 @@ class bKML:
             self.is_constructions_folder_exists = True
             if self.lang == "RU":
                 fname = "Конструктивные элементы"
-                pname, lname = get_pname_lname()
             else:
                 fname = "Construction elements"
-                pname, lname = get_pname_lname()
 
             self.kml_constructions_folder = self.kml.newfolder(name=fname)
 
@@ -97,10 +94,8 @@ class bKML:
 
             if self.lang == "RU":
                 fname = "Прочие особенности"
-                pname, lname = get_pname_lname(self.lang)
             else:
                 fname = "Other features"
-                pname, lname = get_pname_lname(self.lang)
 
             self.kml_others_folder = self.kml.newfolder(name=fname)
 
@@ -292,26 +287,44 @@ class bKML:
             line.style.linestyle.width = 3  # 3 pixels
 
     def dbf_to_kml(self):
-        dbf_conv = DF_DBF.df_DBF(DBF_path=self.dbf_path, lang=self.lang)
-        df_DBF_raw = dbf_conv.convert_dbf(diameter=self.diameter)
+
+        dbf_conf_init = DF_DBF.df_DBF(DBF_path=self.dbf_path, lang=self.lang)
+        df_DBF_raw = dbf_conf_init.convert_dbf(diameter=self.diameter)
+        meter = meter_lang[self.lang]
+
+
+        weld_list = dbf_conf_init.get_welds_list()
 
         # Оставляем лишь координатные
         df_DBF = df_DBF_raw.loc[df_DBF_raw['LATITUDE'] != ""].copy(deep=True)
 
-        # формируем описание для потерей
+        # print (df_DBF['FEA_NUM'])
+
+        # формируем описание для аномалий
         df_DBF['ML_DESCR'] = ''
-        df_DBF.loc[df_DBF['FEA_DEPTH_PRC'] != "", 'ML_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + \
+        df_DBF.loc[df_DBF['FEA_DEPTH_PRC'] != "", 'ML_DESCR'] = df_DBF['FEA_DIST'].astype(str) + meter + \
+                                                                '№' + df_DBF['FEA_NUM'].astype(str) + ' ' + \
                                                                 df_DBF['FEA_CODE_REPLACE'].astype(str) + ' ' + \
                                                                 df_DBF['FEA_DEPTH_PRC'].astype(str) + '%'
-        df_DBF.loc[df_DBF['FEA_DEPTH_PRC'] == "", 'ML_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + \
+        df_DBF.loc[df_DBF['FEA_DEPTH_PRC'] == "", 'ML_DESCR'] = df_DBF['FEA_DIST'].astype(str) + meter + \
+                                                                '№' + df_DBF['FEA_NUM'].astype(str) + ' ' + \
                                                                 df_DBF['FEA_CODE_REPLACE'].astype(str)
 
         # описание для всего остального
-        df_DBF['OTH_DESCR'] = df_DBF['FEA_DIST'].astype(str) + 'м., ' + df_DBF['FEA_CODE_REPLACE'].astype(str) + ' ' + \
+        df_DBF['OTH_DESCR'] = df_DBF['FEA_DIST'].astype(str) + meter + \
+                              '№' + df_DBF['FEA_NUM'].astype(str) + ' ' + \
+                              df_DBF['FEA_CODE_REPLACE'].astype(str) + ' ' + \
                               df_DBF['HAR_CODE1'].astype(str) + ' ' + \
                               df_DBF['COMMENT'].astype(str)
 
-        anoms_df = df_DBF.loc[df_DBF['CLASS'] == 'ANOM']
+        df_DBF['WELD_DESCR'] = ''
+        df_DBF.loc[df_DBF['FEA_CODE'].isin(weld_list), 'WELD_DESCR'] = df_DBF['FEA_DIST'].astype(str) + meter + \
+                                                                       '#' + df_DBF['SECT_NUM'].astype(str) + ', ' + \
+                                                                       df_DBF['FEA_CODE_REPLACE'].astype(str) + ' ' + \
+                                                                       df_DBF['HAR_CODE1'].astype(str) + ' ' + \
+                                                                       df_DBF['COMMENT'].astype(str)
+
+        anoms_df = df_DBF.loc[df_DBF['KML_CLASS'] == 'ANOM']
         anoms_list = anoms_df['FEA_CODE_REPLACE'].value_counts(ascending=True)
         for current_anom_name, row in anoms_list.items():
             current_anom_df = df_DBF.loc[df_DBF['FEA_CODE_REPLACE'] == current_anom_name]
@@ -321,14 +334,14 @@ class bKML:
             else:
                 self.kml_write_anomaly(feature_name=current_anom_name, kml_data=anom_kml_data, isvisible=[0, 0])
 
-        other_df = df_DBF.loc[df_DBF['CLASS'] == 'OTH']
+        other_df = df_DBF.loc[df_DBF['KML_CLASS'] == 'OTH']
         other_list = other_df['FEA_CODE_REPLACE'].value_counts(ascending=True)
         for current_anom_name, row in other_list.items():
             current_anom_df = df_DBF.loc[df_DBF['FEA_CODE_REPLACE'] == current_anom_name]
             other_kml_data = current_anom_df[["OTH_DESCR", 'LATITUDE', 'LONGITUDE']]
             self.kml_write_others(feature_name=current_anom_name, kml_data=other_kml_data, isvisible=[0, 0])
 
-        construct_df = df_DBF.loc[df_DBF['CLASS'] == 'CON']
+        construct_df = df_DBF.loc[df_DBF['KML_CLASS'] == 'CON']
         construct_list = construct_df['FEA_CODE_REPLACE'].value_counts(ascending=True)
         for current_anom_name, row in construct_list.items():
             current_anom_df = df_DBF.loc[df_DBF['FEA_CODE_REPLACE'] == current_anom_name]
@@ -341,16 +354,18 @@ class bKML:
             self.kml_write_construction(feature_name=current_anom_name, kml_data=construct_kml_data,
                                         isvisible=isvisible)
 
-        top_df = df_DBF.loc[df_DBF['CLASS'] == 'TOP']
+        top_df = df_DBF.loc[df_DBF['KML_CLASS'] == 'TOP']
         top_list = top_df['FEA_CODE_REPLACE'].value_counts(ascending=True)
         for current_anom_name, row in top_list.items():
             current_anom_df = df_DBF.loc[df_DBF['FEA_CODE_REPLACE'] == current_anom_name]
-            top_kml_data = current_anom_df[["OTH_DESCR", 'LATITUDE', 'LONGITUDE']]
 
             if current_anom_name in ['Шов', 'Weld']:
+                top_kml_data = current_anom_df[["WELD_DESCR", 'LATITUDE', 'LONGITUDE']]
                 isvisible = [0, 1]
             else:
+                top_kml_data = current_anom_df[["OTH_DESCR", 'LATITUDE', 'LONGITUDE']]
                 isvisible = [1, 0]
+
             self.kml_write_top_lvl(feature_name=current_anom_name, kml_data=top_kml_data, isvisible=isvisible)
 
         absbath = os.path.dirname(self.dbf_path)
@@ -370,17 +385,20 @@ class bKML:
 
 def main():
     lang = 'RU'
-    path = input("Enter DBF path: ")
-    diameter = float(input("Enter Diameter: "))
+    # path = input("Enter DBF path: ")
+    # diameter = float(input("Enter Diameter: "))
 
-    # bKML(dbf_path=path, lang=lang, diameter=diameter).dbf_to_kml()
+    path = r'd:\WORK\#Thailand\NXB 14 inch MTP - SRS, 62 km\Reports\FR\Database\1nxbu.DBF'
+    path = r'd:\WORK\#Thailand\NXD 18 inch  LLK to SRB, 93 km\Reports\FR\Database\Parts_OK\1nxdu_1.dbf'
+    diameter = 11
+    bKML(dbf_path=path, lang=lang, diameter=diameter).dbf_to_kml()
 
-    try:
-        bKML(dbf_path=path, lang=lang, diameter=diameter).dbf_to_kml()
-        input("~~~Done~~~")
-    except Exception as ex:
-        print(ex)
-        input("Что-то пошло не так...")
+    # try:
+    #     bKML(dbf_path=path, lang=lang, diameter=diameter).dbf_to_kml()
+    #     input("~~~Done~~~")
+    # except Exception as ex:
+    #     print(ex)
+    #     input("Что-то пошло не так...")
 
 
 if __name__ == "__main__":
