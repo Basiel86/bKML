@@ -1,21 +1,49 @@
 import pandas as pd
+import numpy as np
+
+
+def same_as_upper(col: pd.Series) -> pd.Series:
+    '''
+    Recursively fill NaN rows with the previous value
+    '''
+    if any(pd.Series(col).isna()):
+        col = pd.Series(np.where(col.isna(), col.shift(1), col))
+        return same_as_upper(col)
+    else:
+        return col
+
 
 if __name__ == '__main__':
+    index_filename = ('test.xlsx')
 
-    index_filename = ('DBF_INDEX.xlsx')
+    test = pd.read_excel(index_filename, sheet_name='Sheet1')
 
-    ind = 103
+    test['JN'] = ""
 
-    df_index_fea_code = pd.read_excel(index_filename, sheet_name='FEA_CODE')
-    id_list = df_index_fea_code['ID']
+    # rows = [i + 10 for i in range(0, len(welds)*10, 10)]
+    # df = pd.Series(rows)
+    # print(df)
+    # test.loc[test['FEA_CODE_REPLACE'] == 'Шов', 'JN'] = df
 
-    for i, row in df_index_fea_code.iterrows():
-        print(df_index_fea_code.loc[i]['ID'])
+    for i, row in test.iterrows():
+        if test.loc[i]['FEA_CODE_REPLACE'] == 'Шов':
+            test.at[i, 'JN'] = i
 
-    if not id_list[id_list.isin([ind])].empty:
-        fea_ru = df_index_fea_code.loc[df_index_fea_code['ID'] == ind]
-        print('found: ', fea_ru)
-        print(fea_ru.loc[1]['FEA_RU'], " / ", fea_ru.loc[1]['TYPE_RU'])
+    # for i in range(0, 200, 10):
+    #     print(i)
 
-    else:
-        print("value not found")
+    test['JN'] = test['JN'].replace('', np.NAN)
+    # test[test['JN'] == ""] = np.NaN
+    test['JN'] = test['JN'].fillna(method='ffill')
+
+
+    print(test)
+
+    # welds = test[test['FEA_CODE_REPLACE'] == "Шов"][['FEA_DIST']]
+
+    # считаем длину секций
+    # test['JL'] = round(test['FEA_DIST'].diff(1), 3)
+    # # двигаем длину секций на 1 вверх
+    # test['JL'] = test['JL'].shift(-1)
+
+    # print(test)

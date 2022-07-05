@@ -385,20 +385,20 @@ class bKML:
 
 def main():
     lang = 'RU'
-    # path = input("Enter DBF path: ")
-    # diameter = float(input("Enter Diameter: "))
+    path = input("Enter DBF path: ")
+    diameter = float(input("Enter Diameter: "))
 
-    path = r'd:\WORK\#Thailand\NXB 14 inch MTP - SRS, 62 km\Reports\FR\Database\1nxbu.DBF'
-    path = r'd:\WORK\#Thailand\NXD 18 inch  LLK to SRB, 93 km\Reports\FR\Database\Parts_OK\1nxdu_1.dbf'
-    diameter = 11
-    bKML(dbf_path=path, lang=lang, diameter=diameter).dbf_to_kml()
+    # path = r'd:\WORK\#Thailand\NXB 14 inch MTP - SRS, 62 km\Reports\FR\Database\1nxbu.DBF'
+    # path = r'd:\WORK\#Thailand\NXD 18 inch  LLK to SRB, 93 km\Reports\FR\Database\Parts_OK\1nxdu_1.dbf'
+    # diameter = 11
+    # bKML(dbf_path=path, lang=lang, diameter=diameter).dbf_to_kml()
 
-    # try:
-    #     bKML(dbf_path=path, lang=lang, diameter=diameter).dbf_to_kml()
-    #     input("~~~Done~~~")
-    # except Exception as ex:
-    #     print(ex)
-    #     input("Что-то пошло не так...")
+    try:
+        bKML(dbf_path=path, lang=lang, diameter=diameter).dbf_to_kml()
+        input("~~~Done~~~")
+    except Exception as ex:
+        print(ex)
+        input("Что-то пошло не так...")
 
 
 if __name__ == "__main__":

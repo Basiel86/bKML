@@ -1,5 +1,6 @@
 import os.path
 import pandas as pd
+import numpy as np
 import sys
 from simpledbf import Dbf5
 from parse_inch import parse_inch
@@ -7,8 +8,18 @@ from dimm import dimm
 
 """
     FEA_CODE_REPLACE - столбец прямой конверсии
-
 """
+
+
+def same_as_upper(col: pd.Series) -> pd.Series:
+    '''
+    Recursively fill NaN rows with the previous value
+    '''
+    if any(pd.Series(col).isna()):
+        col = pd.Series(np.where(col.isna(), col.shift(1), col))
+        return same_as_upper(col)
+    else:
+        return col
 
 
 def resource_path(relative_path):
@@ -35,9 +46,9 @@ class df_DBF:
         self.df_index_har_code2 = pd.read_excel(self.index_filename, sheet_name='HAR_CODE2')
         self.df_index_fea_type = pd.read_excel(self.index_filename, sheet_name='FEA_TYPE')
 
-        self.ml_list = [101, 106, 32869, 3581198, 1081016421]
-        self.geom_list = [201, 32969, 52887753]
-        self.welds_list = [901, 902, 903, 904, 905, 906]
+        self.ml_list = self.df_index_fea_code.loc[self.df_index_fea_code['KML_D_TYPE'] == 'ML', 'ID']
+        self.geom_list = self.df_index_fea_code.loc[self.df_index_fea_code['KML_D_TYPE'] == 'GEOM', 'ID']
+        self.welds_list = self.df_index_fea_code.loc[self.df_index_fea_code['KML_D_TYPE'] == 'WELD', 'ID']
 
         # FEA_RU
         # TYPE_RU
@@ -96,15 +107,27 @@ class df_DBF:
         # чистка длин у швов
         self.df_dbf.loc[self.df_dbf['FEA_CODE'].isin(self.welds_list), 'FEA_LENGTH'] = ''
 
+        # нумеруем кастом JN
+        self.df_dbf['#JN_Custom'] = ''
+        for i, row in self.df_dbf.iterrows():
+            if int(self.df_dbf.loc[i]['FEA_CODE']) in self.welds_list.values:
+                self.df_dbf.at[i, '#JN_Custom'] = (i+1)*10
+        # меняем пустые на NAN и заполнем их предыдущими значениями
+        self.df_dbf['#JN_Custom'] = self.df_dbf['#JN_Custom'].replace('', np.NAN)
+        self.df_dbf['#JN_Custom'] = self.df_dbf['#JN_Custom'].fillna(method='ffill')
         # создаем фрэйм швов
-        welds_jn_dist_array = self.df_dbf.loc[self.df_dbf['FEA_CODE'].isin(self.welds_list)][['SECT_NUM', 'FEA_DIST']]
+        welds_jn_dist_array = self.df_dbf.loc[self.df_dbf['FEA_CODE'].isin(self.welds_list)][['#JN_Custom', 'FEA_DIST', 'FEA_CODE']]
         # считаем длину секций
         welds_jn_dist_array['JL'] = round(welds_jn_dist_array['FEA_DIST'].diff(1), 3)
         # двигаем длину секций на 1 вверх
         welds_jn_dist_array['JL'] = welds_jn_dist_array['JL'].shift(-1)
         # заполняем длину секций общей базы по созданному фрэйму швов
-        self.df_dbf['JL'] = self.df_dbf['SECT_NUM'].map(welds_jn_dist_array.set_index('SECT_NUM')['JL'])
+        try:
+            self.df_dbf['JL'] = self.df_dbf['#JN_Custom'].map(welds_jn_dist_array.set_index('#JN_Custom')['JL'])
+        except Exception as ex:
+            print('no Welds, JL not calculated: ', ex)
 
+        # маска для потерей металла под расчет DIMM
         mask = self.df_dbf['FEA_CODE'].isin(self.ml_list) & \
                self.df_dbf.FEA_LENGTH.notnull() & \
                self.df_dbf.FEA_WIDTH.notnull() & \
@@ -116,8 +139,6 @@ class df_DBF:
                                  return_format=self.lng), axis=1)
         except Exception as ex:
             print('no ML for Dimm:', ex)
-
-        # print(self.df_dbf['DIMM'])
 
         self.df_dbf = self.df_dbf.replace({'nan': '', 'NaN': '', float('NaN'): '', -1111111: ''})
 
@@ -153,8 +174,7 @@ if __name__ == '__main__':
     DEBUG = 0
 
     if DEBUG == 1:
-        path = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\Test\1nxbu.dbf"
-        path1 = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\Test\2nsiu.DBF"
+        path = r"d:\WORK\#Thailand\NXD 18 inch  LLK to SRB, 93 km\Previous IP\2fdku.dbf"
         lang = "RU"
         diam = 254
     else:
