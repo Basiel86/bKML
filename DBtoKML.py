@@ -2,6 +2,7 @@ import simplekml
 import DF_DBF
 import os
 
+
 ml_range_colors = {'0-10': [99, 190, 123],
                    '10-20': [138, 201, 125],
                    '20-30': [177, 212, 127],
@@ -148,21 +149,21 @@ class bKML:
         point_visibility = isvisible[0]
         feature_line = ([])
 
-        kml_data = kml_data.loc[kml_data['FEA_DEPTH_PRC'] != ""].copy(deep=True)
+        kml_data = kml_data.loc[kml_data['#DEPTH_PRC'] != ""].copy(deep=True)
 
         for i in range(8):
             min_depth = i * 10
             max_depth = (i + 1) * 10
             ml_range = str(min_depth) + "-" + str(max_depth)
 
-            current_range_df = kml_data[kml_data['FEA_DEPTH_PRC'].between(min_depth, max_depth, inclusive="right")]
+            current_range_df = kml_data[kml_data['#DEPTH_PRC'].between(min_depth, max_depth, inclusive="right")]
 
             if len(current_range_df) < max_group_count:
 
                 # вытаскивание 5000 глубочайших в серии
-                #     current_range_df = current_range_df.sort_values('FEA_DEPTH_PRC')
+                #     current_range_df = current_range_df.sort_values('#DEPTH_PRC')
                 #     current_range_df = current_range_df.iloc[0:max_group_count]#.copy(deep=True)
-                #     current_range_df = current_range_df.sort_values('FEA_DIST')
+                #     current_range_df = current_range_df.sort_values('#DIST_START')
                 # print(f'{min_depth}-{max_depth} count: {len(current_range_df)}')
 
                 if len(current_range_df) > 0:
@@ -296,56 +297,56 @@ class bKML:
         weld_list = dbf_conf_init.get_welds_list()
 
         # Оставляем лишь координатные
-        df_DBF = df_DBF_raw.loc[df_DBF_raw['LATITUDE'] != ""].copy(deep=True)
+        df_DBF = df_DBF_raw.loc[df_DBF_raw['#LAT'] != ""].copy(deep=True)
 
-        # print (df_DBF['FEA_NUM'])
+        # print (df_DBF['#FEA_NUM'])
 
         # формируем описание для аномалий
         df_DBF['ML_DESCR'] = ''
-        df_DBF.loc[df_DBF['FEA_DEPTH_PRC'] != "", 'ML_DESCR'] = df_DBF['FEA_DIST'].astype(str) + meter + \
-                                                                '№' + df_DBF['FEA_NUM'].astype(str) + ' ' + \
-                                                                df_DBF['FEA_CODE_REPLACE'].astype(str) + ' ' + \
-                                                                df_DBF['FEA_DEPTH_PRC'].astype(str) + '%'
-        df_DBF.loc[df_DBF['FEA_DEPTH_PRC'] == "", 'ML_DESCR'] = df_DBF['FEA_DIST'].astype(str) + meter + \
-                                                                '№' + df_DBF['FEA_NUM'].astype(str) + ' ' + \
-                                                                df_DBF['FEA_CODE_REPLACE'].astype(str)
+        df_DBF.loc[df_DBF['#DEPTH_PRC'] != "", 'ML_DESCR'] = df_DBF['#DIST_START'].astype(str) + meter + \
+                                                                '№' + df_DBF['#FEA_NUM'].astype(str) + ' ' + \
+                                                                df_DBF['#FEA_CODE_REPLACE'].astype(str) + ' ' + \
+                                                                df_DBF['#DEPTH_PRC'].astype(str) + '%'
+        df_DBF.loc[df_DBF['#DEPTH_PRC'] == "", 'ML_DESCR'] = df_DBF['#DIST_START'].astype(str) + meter + \
+                                                                '№' + df_DBF['#FEA_NUM'].astype(str) + ' ' + \
+                                                                df_DBF['#FEA_CODE_REPLACE'].astype(str)
 
         # описание для всего остального
-        df_DBF['OTH_DESCR'] = df_DBF['FEA_DIST'].astype(str) + meter + \
-                              '№' + df_DBF['FEA_NUM'].astype(str) + ' ' + \
-                              df_DBF['FEA_CODE_REPLACE'].astype(str) + ' ' + \
-                              df_DBF['HAR_CODE1'].astype(str) + ' ' + \
-                              df_DBF['COMMENT'].astype(str)
+        df_DBF['OTH_DESCR'] = df_DBF['#DIST_START'].astype(str) + meter + \
+                              '№' + df_DBF['#FEA_NUM'].astype(str) + ' ' + \
+                              df_DBF['#FEA_CODE_REPLACE'].astype(str) + ' ' + \
+                              df_DBF['#HAR_CODE1'].astype(str) + ' ' + \
+                              df_DBF['#DESCR'].astype(str)
 
         df_DBF['WELD_DESCR'] = ''
-        df_DBF.loc[df_DBF['FEA_CODE'].isin(weld_list), 'WELD_DESCR'] = df_DBF['FEA_DIST'].astype(str) + meter + \
-                                                                       '#' + df_DBF['SECT_NUM'].astype(str) + ', ' + \
-                                                                       df_DBF['FEA_CODE_REPLACE'].astype(str) + ' ' + \
-                                                                       df_DBF['HAR_CODE1'].astype(str) + ' ' + \
-                                                                       df_DBF['COMMENT'].astype(str)
+        df_DBF.loc[df_DBF['#FEA_CODE'].isin(weld_list), 'WELD_DESCR'] = df_DBF['#DIST_START'].astype(str) + meter + \
+                                                                       '#' + df_DBF['#JN'].astype(str) + ', ' + \
+                                                                       df_DBF['#FEA_CODE_REPLACE'].astype(str) + ' ' + \
+                                                                       df_DBF['#HAR_CODE1'].astype(str) + ' ' + \
+                                                                       df_DBF['#DESCR'].astype(str)
 
-        anoms_df = df_DBF.loc[df_DBF['KML_CLASS'] == 'ANOM']
-        anoms_list = anoms_df['FEA_CODE_REPLACE'].value_counts(ascending=True)
+        anoms_df = df_DBF.loc[df_DBF['#KML_CLASS'] == 'ANOM']
+        anoms_list = anoms_df['#FEA_CODE_REPLACE'].value_counts(ascending=True)
         for current_anom_name, row in anoms_list.items():
-            current_anom_df = df_DBF.loc[df_DBF['FEA_CODE_REPLACE'] == current_anom_name]
-            anom_kml_data = current_anom_df[["ML_DESCR", 'LATITUDE', 'LONGITUDE', 'FEA_DEPTH_PRC', 'FEA_DIST']]
+            current_anom_df = df_DBF.loc[df_DBF['#FEA_CODE_REPLACE'] == current_anom_name]
+            anom_kml_data = current_anom_df[['ML_DESCR', '#LAT', '#LONG', '#DEPTH_PRC', '#DIST_START']]
             if current_anom_name in ['Потеря металла', 'Metal Loss']:
                 self.kml_write_ml_subranges(kml_data=anom_kml_data, isvisible=[0, 0])
             else:
                 self.kml_write_anomaly(feature_name=current_anom_name, kml_data=anom_kml_data, isvisible=[0, 0])
 
-        other_df = df_DBF.loc[df_DBF['KML_CLASS'] == 'OTH']
-        other_list = other_df['FEA_CODE_REPLACE'].value_counts(ascending=True)
+        other_df = df_DBF.loc[df_DBF['#KML_CLASS'] == 'OTH']
+        other_list = other_df['#FEA_CODE_REPLACE'].value_counts(ascending=True)
         for current_anom_name, row in other_list.items():
-            current_anom_df = df_DBF.loc[df_DBF['FEA_CODE_REPLACE'] == current_anom_name]
-            other_kml_data = current_anom_df[["OTH_DESCR", 'LATITUDE', 'LONGITUDE']]
+            current_anom_df = df_DBF.loc[df_DBF['#FEA_CODE_REPLACE'] == current_anom_name]
+            other_kml_data = current_anom_df[["OTH_DESCR", '#LAT', '#LONG']]
             self.kml_write_others(feature_name=current_anom_name, kml_data=other_kml_data, isvisible=[0, 0])
 
-        construct_df = df_DBF.loc[df_DBF['KML_CLASS'] == 'CON']
-        construct_list = construct_df['FEA_CODE_REPLACE'].value_counts(ascending=True)
+        construct_df = df_DBF.loc[df_DBF['#KML_CLASS'] == 'CON']
+        construct_list = construct_df['#FEA_CODE_REPLACE'].value_counts(ascending=True)
         for current_anom_name, row in construct_list.items():
-            current_anom_df = df_DBF.loc[df_DBF['FEA_CODE_REPLACE'] == current_anom_name]
-            construct_kml_data = current_anom_df[["OTH_DESCR", 'LATITUDE', 'LONGITUDE']]
+            current_anom_df = df_DBF.loc[df_DBF['#FEA_CODE_REPLACE'] == current_anom_name]
+            construct_kml_data = current_anom_df[["OTH_DESCR", '#LAT', '#LONG']]
 
             if current_anom_name in ['Задвижка', 'Valve']:
                 isvisible = [1, 0]
@@ -354,16 +355,16 @@ class bKML:
             self.kml_write_construction(feature_name=current_anom_name, kml_data=construct_kml_data,
                                         isvisible=isvisible)
 
-        top_df = df_DBF.loc[df_DBF['KML_CLASS'] == 'TOP']
-        top_list = top_df['FEA_CODE_REPLACE'].value_counts(ascending=True)
+        top_df = df_DBF.loc[df_DBF['#KML_CLASS'] == 'TOP']
+        top_list = top_df['#FEA_CODE_REPLACE'].value_counts(ascending=True)
         for current_anom_name, row in top_list.items():
-            current_anom_df = df_DBF.loc[df_DBF['FEA_CODE_REPLACE'] == current_anom_name]
+            current_anom_df = df_DBF.loc[df_DBF['#FEA_CODE_REPLACE'] == current_anom_name]
 
             if current_anom_name in ['Шов', 'Weld']:
-                top_kml_data = current_anom_df[["WELD_DESCR", 'LATITUDE', 'LONGITUDE']]
+                top_kml_data = current_anom_df[["WELD_DESCR", '#LAT', '#LONG']]
                 isvisible = [0, 1]
             else:
-                top_kml_data = current_anom_df[["OTH_DESCR", 'LATITUDE', 'LONGITUDE']]
+                top_kml_data = current_anom_df[["OTH_DESCR", '#LAT', '#LONG']]
                 isvisible = [1, 0]
 
             self.kml_write_top_lvl(feature_name=current_anom_name, kml_data=top_kml_data, isvisible=isvisible)

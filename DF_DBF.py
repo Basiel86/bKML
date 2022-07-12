@@ -5,9 +5,12 @@ import sys
 from simpledbf import Dbf5
 from parse_inch import parse_inch
 from dimm import dimm
+import errno
+from other_functions import dbf_feature_type_combine
+from other_functions import dbf_description_combine
 
 """
-    FEA_CODE_REPLACE - столбец прямой конверсии
+    #FEA_CODE_REPLACE - столбец прямой конверсии
 """
 
 
@@ -39,16 +42,45 @@ class df_DBF:
         self.lng = lang
         self.dbf_path = DBF_path
         self.index_filename = resource_path('DBF_INDEX.xlsx')
+        self.struct_filename = resource_path('STRUCT.xlsx')
 
         # Списки из Экселя
-        self.df_index_fea_code = pd.read_excel(self.index_filename, sheet_name='FEA_CODE')
-        self.df_index_har_code1 = pd.read_excel(self.index_filename, sheet_name='HAR_CODE1')
-        self.df_index_har_code2 = pd.read_excel(self.index_filename, sheet_name='HAR_CODE2')
-        self.df_index_fea_type = pd.read_excel(self.index_filename, sheet_name='FEA_TYPE')
+        try:
+            self.df_index_fea_code = pd.read_excel(self.index_filename, sheet_name='FEA_CODE')
+
+            self.df_index_har_code1 = pd.read_excel(self.index_filename, sheet_name='HAR_CODE1')
+
+            # списки с описаниями в FT или Description
+            har_code1_ft_list_RU = self.df_index_har_code1.loc[self.df_index_har_code1['LOC'] == 'FT']['RU'].tolist()
+            har_code1_ft_list_EN = self.df_index_har_code1.loc[self.df_index_har_code1['LOC'] == 'FT']['EN'].tolist()
+            har_code1_d_list_RU = self.df_index_har_code1.loc[self.df_index_har_code1['LOC'] == 'D']['RU'].tolist()
+            har_code1_d_list_EN = self.df_index_har_code1.loc[self.df_index_har_code1['LOC'] == 'D']['EN'].tolist()
+
+            self.df_index_har_code2 = pd.read_excel(self.index_filename, sheet_name='HAR_CODE2')
+            har_code2_ft_list_RU = self.df_index_har_code2.loc[self.df_index_har_code2['LOC'] == 'FT']['RU'].tolist()
+            har_code2_ft_list_EN = self.df_index_har_code2.loc[self.df_index_har_code2['LOC'] == 'FT']['EN'].tolist()
+            har_code2_d_list_RU = self.df_index_har_code2.loc[self.df_index_har_code2['LOC'] == 'D']['RU'].tolist()
+            har_code2_d_list_EN = self.df_index_har_code2.loc[self.df_index_har_code2['LOC'] == 'D']['EN'].tolist()
+
+            self.har_code_ft_list = har_code1_ft_list_RU + har_code2_ft_list_RU + har_code1_ft_list_EN + har_code2_ft_list_EN
+            self.har_code_d_list = har_code1_d_list_RU + har_code2_d_list_RU + har_code1_d_list_EN + har_code2_d_list_EN
+
+            self.df_index_fea_type = pd.read_excel(self.index_filename, sheet_name='FEA_TYPE')
+        except OSError as e:
+            if e.errno == errno.EACCES:
+                print("Permission ERROR: DBF_INDEX.xlsx")
+                sys.exit()
+        try:
+            self.df_struct = pd.read_excel(self.struct_filename, sheet_name='STRUCT')
+        except OSError as e:
+            if e.errno == errno.EACCES:
+                print("Permission ERROR: STRUCT.xlsx")
+                sys.exit()
 
         self.ml_list = self.df_index_fea_code.loc[self.df_index_fea_code['KML_D_TYPE'] == 'ML', 'ID']
         self.geom_list = self.df_index_fea_code.loc[self.df_index_fea_code['KML_D_TYPE'] == 'GEOM', 'ID']
         self.welds_list = self.df_index_fea_code.loc[self.df_index_fea_code['KML_D_TYPE'] == 'WELD', 'ID']
+        self.lam_list = self.df_index_fea_code.loc[self.df_index_fea_code['KML_D_TYPE'] == 'LAM', 'ID']
 
         # FEA_RU
         # TYPE_RU
@@ -57,12 +89,27 @@ class df_DBF:
 
         dbf_raw = Dbf5(self.dbf_path, codec='cp1251')
         self.df_dbf = dbf_raw.to_dataframe()
-        self.df_dbf['FEA_CODE_REPLACE'] = self.df_dbf['FEA_CODE']
-        self.df_dbf['KML_CLASS'] = self.df_dbf['FEA_CODE']
-        self.df_dbf['FEATURE'] = ''
-        self.df_dbf['FEATURE_TYPE'] = ''
-        self.df_dbf['JL'] = ''
-        self.df_dbf['DIMM'] = ''
+
+        # переименовываем столбцы
+        for i, row in self.df_struct.iterrows():
+            struct_column_to_replace = str(self.df_struct.loc[i]["DBF_COL"])
+            struct_column_target_name = str(self.df_struct.loc[i]["TARGET_COL_NAME"])
+            if struct_column_to_replace in self.df_dbf.columns:
+                self.df_dbf = self.df_dbf.rename(columns={struct_column_to_replace: struct_column_target_name})
+
+        self.df_dbf['#FEA_CODE_REPLACE'] = self.df_dbf['#FEA_CODE']
+        self.df_dbf['#HAR_CODE1_REPLACE'] = self.df_dbf['#HAR_CODE1']
+        self.df_dbf['#HAR_CODE2_REPLACE'] = self.df_dbf['#HAR_CODE2']
+        self.df_dbf['#KML_CLASS'] = self.df_dbf['#FEA_CODE']
+        self.df_dbf['#FEATURE'] = self.df_dbf['#FEA_CODE']
+        self.df_dbf['#FEA_CODE_REPLACE_FT'] = self.df_dbf['#FEA_CODE']
+        self.df_dbf['#JL'] = ''
+        self.df_dbf['#DIMM'] = ''
+        self.df_dbf['#DESCR'] = ''
+        self.df_dbf['#REMAIN_WT'] = ''
+
+        if "#CORR" not in self.df_dbf.columns:
+            self.df_dbf['#CORR'] = ''
 
     def get_ml_list(self):
         return self.ml_list
@@ -78,64 +125,95 @@ class df_DBF:
         if diameter < 100:
             diameter = diameter * 25.4
 
-        self.df_replace(self.df_index_fea_code, "FEA_CODE_REPLACE", change_class=True)
-        self.df_replace(self.df_index_har_code1, "HAR_CODE1")
-        self.df_replace(self.df_index_har_code2, "HAR_CODE2")
-        self.df_replace(self.df_index_fea_type, "FEA_TYPE")
-        # self.fea_type_parse()
+        self.df_replace(self.df_index_fea_code, '#FEA_CODE_REPLACE', change_class=True)
 
+        self.df_replace(self.df_index_fea_code, '#FEATURE', fea=True)
+        self.df_replace(self.df_index_fea_code, '#FEA_CODE_REPLACE_FT', ftype=True)
+
+        self.df_replace(self.df_index_har_code1, '#HAR_CODE1_REPLACE')
+        self.df_replace(self.df_index_har_code2, '#HAR_CODE2_REPLACE')
+        self.df_replace(self.df_index_fea_type, '#LOC')
+
+        # exportpath = r'd:\WORK\OrenburgNeft\NOA 8 inch DNS Olhovskaya to Terminal Service, 19.749 km\Reports\PR\Run3\DB_corr dist\123.csv'
+        # self.df_dbf.to_csv(exportpath, encoding='cp1251', index=False)
+
+        self.df_dbf['#FEATURE_TYPE'] = self.df_dbf.apply(
+            lambda row: dbf_feature_type_combine(fea_code_replace_ft=row['#FEA_CODE_REPLACE_FT'],
+                                                 har_code1=row['#HAR_CODE1_REPLACE'],
+                                                 har_code2=row['#HAR_CODE2_REPLACE'], corr=row['#CORR'],
+                                                 description=row['#DBF_DESCR'], ft_list=self.har_code_ft_list,
+                                                 d_list=self.har_code_d_list), axis=1)
+
+        self.df_dbf['#DESCR'] = self.df_dbf.apply(
+            lambda row: dbf_description_combine(har_code1=row['#HAR_CODE1_REPLACE'],
+                                                har_code2=row['#HAR_CODE2_REPLACE'], corr=row['#CORR'],
+                                                description=row['#DBF_DESCR'], ft_list=self.har_code_ft_list,
+                                                d_list=self.har_code_d_list), axis=1)
+
+        # вычитаем и добавляем к дистации швов для корректной сортировки Аномалий и прочего на дистанции шва
+        self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list), '#DIST_START'] = \
+            self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list), '#DIST_START'] + 0.0001
         # сортировка по дистации
-        self.df_dbf = self.df_dbf.sort_values('FEA_DIST')
+        self.df_dbf = self.df_dbf.sort_values('#DIST_START')
+        self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list), '#DIST_START'] = \
+            self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list), '#DIST_START'] - 0.0001
+
         # конвертирование Глубины в числа
-        self.df_dbf['FEA_DEPTH'] = pd.to_numeric(self.df_dbf['FEA_DEPTH'], errors='coerce')
+        self.df_dbf['#DEPTH_MM'] = pd.to_numeric(self.df_dbf['#DEPTH_MM'], errors='coerce')
+
+        # расчет остаточной толщины стенки
+        self.df_dbf['#REMAIN_WT'] = self.df_dbf.loc[self.df_dbf['#DEPTH_MM'] != '', '#WT'] - self.df_dbf.loc[
+            self.df_dbf['#DEPTH_MM'] != '', '#DEPTH_MM']
+
         # конвертирование Номера особенности в числа
-        self.df_dbf['FEA_NUM'] = self.df_dbf['FEA_NUM'].fillna(-1111111).astype(int)
+        self.df_dbf['#FEA_NUM'] = self.df_dbf['#FEA_NUM'].fillna(-1111111).astype(int)
 
         # https://stackoverflow.com/questions/25952790/convert-pandas-series-from-dtype-object-to-float-and-errors-to-nans
 
         # конвертирование WT в число
-        self.df_dbf['WT'] = pd.to_numeric(self.df_dbf['WT'], errors='coerce')
+        self.df_dbf['#WT'] = pd.to_numeric(self.df_dbf['#WT'], errors='coerce')
 
         # глубины вмятина в процентах
-        self.df_dbf.loc[self.df_dbf['FEA_CODE'].isin(self.geom_list), 'FEA_DEPTH_PRC'] = round(
-            self.df_dbf['FEA_DEPTH'] / diameter * 100, 1)
-        # глубины потерь в процентах
-        self.df_dbf.loc[self.df_dbf['FEA_CODE'].isin(self.ml_list), 'FEA_DEPTH_PRC'] = round(
-            self.df_dbf['FEA_DEPTH'] / self.df_dbf['WT'] * 100, 1)
+        self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.geom_list), '#DEPTH_PRC'] = round(
+            self.df_dbf['#DEPTH_MM'] / diameter * 100, 1)
+        # глубины  процентах
+        self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.ml_list) | self.df_dbf['#FEA_CODE'].isin(
+            self.lam_list), '#DEPTH_PRC'] = round(self.df_dbf['#DEPTH_MM'] / self.df_dbf['#WT'] * 100, 1)
         # глубина '1' если получилась отрицательной (для проверки)
-        self.df_dbf.loc[self.df_dbf['FEA_DEPTH_PRC'] < 0, 'FEA_DEPTH_PRC'] = 1
+        self.df_dbf.loc[self.df_dbf['#DEPTH_PRC'] < 0, '#DEPTH_PRC'] = 1
         # чистка длин у швов
-        self.df_dbf.loc[self.df_dbf['FEA_CODE'].isin(self.welds_list), 'FEA_LENGTH'] = ''
+        self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list), '#LENGTH'] = ''
 
         # нумеруем кастом JN
         self.df_dbf['#JN_Custom'] = ''
         for i, row in self.df_dbf.iterrows():
-            if int(self.df_dbf.loc[i]['FEA_CODE']) in self.welds_list.values:
-                self.df_dbf.at[i, '#JN_Custom'] = (i+1)*10
+            if int(self.df_dbf.loc[i]['#FEA_CODE']) in self.welds_list.values:
+                self.df_dbf.at[i, '#JN_Custom'] = (i + 1) * 10
         # меняем пустые на NAN и заполнем их предыдущими значениями
         self.df_dbf['#JN_Custom'] = self.df_dbf['#JN_Custom'].replace('', np.NAN)
         self.df_dbf['#JN_Custom'] = self.df_dbf['#JN_Custom'].fillna(method='ffill')
         # создаем фрэйм швов
-        welds_jn_dist_array = self.df_dbf.loc[self.df_dbf['FEA_CODE'].isin(self.welds_list)][['#JN_Custom', 'FEA_DIST', 'FEA_CODE']]
+        welds_jn_dist_array = self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list)][
+            ['#JN_Custom', '#DIST_START', '#FEA_CODE']]
         # считаем длину секций
-        welds_jn_dist_array['JL'] = round(welds_jn_dist_array['FEA_DIST'].diff(1), 3)
+        welds_jn_dist_array['#JL'] = round(welds_jn_dist_array['#DIST_START'].diff(1), 3)
         # двигаем длину секций на 1 вверх
-        welds_jn_dist_array['JL'] = welds_jn_dist_array['JL'].shift(-1)
+        welds_jn_dist_array['#JL'] = welds_jn_dist_array['#JL'].shift(-1)
         # заполняем длину секций общей базы по созданному фрэйму швов
         try:
-            self.df_dbf['JL'] = self.df_dbf['#JN_Custom'].map(welds_jn_dist_array.set_index('#JN_Custom')['JL'])
+            self.df_dbf['#JL'] = self.df_dbf['#JN_Custom'].map(welds_jn_dist_array.set_index('#JN_Custom')['#JL'])
         except Exception as ex:
             print('no Welds, JL not calculated: ', ex)
 
         # маска для потерей металла под расчет DIMM
-        mask = self.df_dbf['FEA_CODE'].isin(self.ml_list) & \
-               self.df_dbf.FEA_LENGTH.notnull() & \
-               self.df_dbf.FEA_WIDTH.notnull() & \
-               self.df_dbf.WT.notnull()
+        mask = self.df_dbf['#FEA_CODE'].isin(self.ml_list) & \
+               self.df_dbf["#LENGTH"].notnull() & \
+               self.df_dbf["#WIDTH"].notnull() & \
+               self.df_dbf["#WT"].notnull()
 
         try:
-            self.df_dbf['DIMM'] = self.df_dbf[mask].apply(
-                lambda row: dimm(length=row['FEA_LENGTH'], width=row['FEA_WIDTH'], wt=row['WT'],
+            self.df_dbf['#DIMM'] = self.df_dbf[mask].apply(
+                lambda row: dimm(length=row['#LENGTH'], width=row['#WIDTH'], wt=row['#WT'],
                                  return_format=self.lng), axis=1)
         except Exception as ex:
             print('no ML for Dimm:', ex)
@@ -144,17 +222,23 @@ class df_DBF:
 
         return self.df_dbf
 
-    def df_replace(self, df_what, replace_column_name, change_class=False):
+    def df_replace(self, df_what, replace_column_name, change_class=False, fea=False, ftype=False):
 
         for i, row in df_what.iterrows():
             if i < len(df_what):
                 f_ID = int(df_what.loc[i]['ID'])
-                f_ID_DSCR = str(df_what.loc[i][self.lng])
+
+                if fea is False and ftype is False:
+                    f_ID_DSCR = str(df_what.loc[i][self.lng])
+                if fea is True:
+                    f_ID_DSCR = str(df_what.loc[i][f'FEA_{self.lng}'])
+                if ftype is True:
+                    f_ID_DSCR = str(df_what.loc[i][f'TYPE_{self.lng}'])
                 # print(i, " - ", f_ID, " - ", f_ID_DSCR)
                 self.df_dbf.loc[self.df_dbf[replace_column_name] == f_ID, replace_column_name] = f_ID_DSCR
                 if change_class is True:
                     f_ID_CLASS = str(df_what.loc[i]['KML_CLASS'])
-                    self.df_dbf.loc[self.df_dbf['KML_CLASS'] == f_ID, 'KML_CLASS'] = f_ID_CLASS
+                    self.df_dbf.loc[self.df_dbf['#KML_CLASS'] == f_ID, '#KML_CLASS'] = f_ID_CLASS
         # print("Replace ", replace_column_name, " done")
 
     def fea_type_parse(self):
@@ -162,19 +246,19 @@ class df_DBF:
         id_list = self.df_index_fea_code['ID']
 
         for i, row in self.df_dbf.iterrows():
-            ind = self.df_dbf.loc[i]['FEA_CODE']
+            ind = self.df_dbf.loc[i]['#FEA_CODE']
             if not id_list[id_list.isin([ind])].empty:
                 ID_ROW = self.df_index_fea_code.loc[self.df_index_fea_code['ID'] == ind]
-                self.df_dbf.loc[i]['FEATURE'] = ID_ROW.loc[1]['FEA_RU']
-                self.df_dbf.loc[i]['FEATURE_TYPE'] = ID_ROW.loc[1]['TYPE_RU']
+                self.df_dbf.loc[i]['#FEATURE'] = ID_ROW.loc[1]['FEA_RU']
+                self.df_dbf.loc[i]['#FEATURE_TYPE'] = ID_ROW.loc[1]['TYPE_RU']
 
 
 if __name__ == '__main__':
 
-    DEBUG = 0
+    DEBUG = 1
 
     if DEBUG == 1:
-        path = r"d:\WORK\#Thailand\NXD 18 inch  LLK to SRB, 93 km\Previous IP\2fdku.dbf"
+        path = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\Test\3nocm.DBF"
         lang = "RU"
         diam = 254
     else:
@@ -221,12 +305,15 @@ if __name__ == '__main__':
     df_dbf = df_DBF(DBF_path=path, lang=lang)
     exp = df_dbf.convert_dbf(diameter=diam)
 
-    exp_format = ['SECT_NUM', 'FEA_NUM', 'FEA_DIST', 'JL', 'REL_DIST', 'DOC', 'FEA_CODE_REPLACE', 'HAR_CODE1',
-                  'HAR_CODE2',
-                  'COMMENT',
-                  'REMARKS', 'ERF', 'CLUST_NUM',
-                  'MAOP', 'WT', 'FEA_DEPTH', 'FEA_DEPTH_PRC', 'AMPL_MFL', 'DEPTH_PREV', 'DEPTH_TMP', 'DEPTH_TMP2',
-                  'FEA_LENGTH', 'FEA_WIDTH', 'CLCK_DP', 'FEA_TYPE', 'DIMM', 'LATITUDE', 'LONGITUDE', 'HEIGHT']
+    exp_format = ['#FEA_NUM', '#JN', '#DIST_START', '#US', '#JL', '#DOC', '#FEATURE', '#FEATURE_TYPE',
+                  '#DESCR', '#LENGTH', '#WIDTH', '#DEPTH_PRC', '#DEPTH_MM', '#ORIENT', '#WT', '#REMAIN_WT', '#DIMM',
+                  '#CLUSTER', '#LOC', '#ERF', '#PSAFE', '#LAT', '#LONG', '#ALT', '#FEA_CODE_REPLACE', '#HAR_CODE1_REPLACE',
+                  '#HAR_CODE2_REPLACE', '#DBF_DESCR']
+
+    exp_format1 = ['#JN', '#FEA_NUM', '#DIST_START', '#JL', '#US', '#DOC', '#FEA_CODE_REPLACE', '#HAR_CODE1_REPLACE',
+                   '#HAR_CODE2_REPLACE', '#FEATURE_TYPE', '#DBF_DESCR', "#DESCR", '#CORR', '#ERF', '#CLUSTER',
+                   '#PSAFE', '#WT', '#DEPTH_MM', '#DEPTH_PRC', '#AMPL', '#DEPTH_PREV',
+                   '#LENGTH', '#WIDTH', '#ORIENT', '#LOC', '#DIMM', '#LAT', '#LONG', '#ALT']
 
     total_coluns = exp.columns.values.tolist()
     cross_columns = []
@@ -238,6 +325,12 @@ if __name__ == '__main__':
     # print(cross_columns)
 
     exp1 = exp[cross_columns]
+
+    # with open(file_path, 'w') as f:
+    #    f.write('Custom String\n')
+
+    # df.to_csv(file_path, header=False, mode="a")
+    # print (cross_columns)
 
     absbath = os.path.dirname(path)
     basename = os.path.basename(path)

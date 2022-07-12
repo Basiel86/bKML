@@ -46,5 +46,7 @@ def parse_inch(file_path):
 
 
 if __name__ == '__main__':
+
+    path = r"z:\Projects\Russia\Orenburgneft\NOD 10 inch ННП ДНС Рыбкинская-УПН Загорская 2 й участок, 24.5 km\Reports\FR\2021.12\Database"
     inch = parse_inch(path)
     print(inch)
