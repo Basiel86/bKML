@@ -255,7 +255,7 @@ class df_DBF:
 
 if __name__ == '__main__':
 
-    DEBUG = 1
+    DEBUG = 0
 
     if DEBUG == 1:
         path = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\Test\3nocm.DBF"
@@ -281,7 +281,7 @@ if __name__ == '__main__':
                 diam = input("INCH?: ")
 
             if arg == '':
-                lang = input("'1' for EN?: ")
+                lang = input("'1/2' for EN/SP?: ")
             else:
                 lang = "EN"
 
@@ -298,6 +298,8 @@ if __name__ == '__main__':
 
             if lang == '1':
                 lang = "EN"
+            elif lang == '2':
+                lang = "SP"
             else:
                 lang = "RU"
 
@@ -335,14 +337,25 @@ if __name__ == '__main__':
     absbath = os.path.dirname(path)
     basename = os.path.basename(path)
     exportpath = os.path.join(absbath, basename)
-    exportpath = f'{exportpath[:-4]}.csv'
+    exportpath_csv = f'{exportpath[:-4]}.csv'
+    exportpath_xlsx = f'{exportpath[:-4]}.xlsx'
+
+    if lang == "RU":
+        csv_encoding = "cp1251"
+    else:
+        csv_encoding = "utf-8"
     try:
-        exp1.to_csv(exportpath, encoding='cp1251', index=False)
+        exp1.to_csv(exportpath_csv, encoding=csv_encoding, index=False)
+        if lang == "SP":
+            exp1.to_excel(exportpath_xlsx, encoding=csv_encoding, index=False)
     except Exception as PermissionError:
         print(f"'{basename[:-4]}.csv' is opened, saved as '{basename[:-4]}_1.csv'")
         exportpath = os.path.join(absbath, basename)
-        exportpath = f'{exportpath[:-4]}_1.csv'
-        exp1.to_csv(exportpath, encoding='cp1251', index=False)
+        exportpath_csv = f'{exportpath[:-4]}_1.csv'
+        exportpath_xlsx = f'{exportpath[:-4]}_1.xlsx'
+        exp1.to_csv(exportpath_csv, encoding=csv_encoding, index=False)
+        if lang == "SP":
+            exp1.to_excel(exportpath_xlsx, encoding=csv_encoding, index=False)
 
     if DEBUG != 1:
         input("~~~ Done~~~")

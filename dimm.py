@@ -14,6 +14,14 @@ dimm_types_dict = {"RU": {1: "Общий",
                           6: "Circumferential Grooving",
                           7: "Circumferential Slotting",
                           },
+                   "SP": {1: "General",
+                          2: "Pinchazo, defecto puntual",
+                          3: "Agujero, defecto directo",
+                          4: "Ranura axial",
+                          5: "Rasguño axial",
+                          6: "Ranura circunferencial",
+                          7: "Rasguño circunferencial",
+                          },
                    "SHORT": {1: "GENE",
                              2: "PITT",
                              3: "PINH",
@@ -26,7 +34,7 @@ dimm_types_dict = {"RU": {1: "Общий",
 
 
 def dimm(length, width, wt, return_format="RU"):
-    if return_format not in ["RU", "EN", "SHORT"]:
+    if return_format not in ["RU", "EN", "SP", "SHORT"]:
         return_format = "RU"
 
     dimm_dict = dimm_types_dict[return_format]
