@@ -12,16 +12,16 @@ def dbf_feature_type_combine(fea_code_replace_ft, har_code1, har_code2, corr, de
     har_code1_ft = ''
     har_code2_ft = ''
     if fea_code_replace_ft in ft_list:
-        fea_code_replace_ft = str(fea_code_replace_ft).lower()
+        fea_code_replace_ft = fea_code_replace_ft
     if har_code1 in ft_list:
-        har_code1_ft = str(empty_if_nan(har_code1)).lower()
+        har_code1_ft = empty_if_nan(har_code1)
     if har_code2 in ft_list:
-        har_code2_ft = str(empty_if_nan(har_code2)).lower()
+        har_code2_ft = empty_if_nan(har_code2)
 
-    corr = str(empty_if_nan(corr)).lower()
-    description = str(empty_if_nan(description)).lower()
+    corr = empty_if_nan(corr)
+    description = empty_if_nan(description)
 
-    feature_type = f"{fea_code_replace_ft}, {corr}, {har_code1_ft}, {har_code2_ft}"
+    feature_type = f"{fea_code_replace_ft}, {har_code2_ft}, {corr}, {har_code1_ft}"
 
     feature_type = feature_type.replace(', , , , ', ', , , ')
     feature_type = feature_type.replace(', , , ', ', , ')
@@ -32,7 +32,10 @@ def dbf_feature_type_combine(fea_code_replace_ft, har_code1, har_code2, corr, de
     if feature_type[-2:] == ', ':
         feature_type = feature_type[:-2]
 
-    return str(feature_type).capitalize()
+    if len(feature_type) > 1:
+        feature_type = feature_type[0].upper() + feature_type[1:]
+
+    return feature_type
 
 
 def dbf_description_combine(har_code1, har_code2, corr, description, ft_list, d_list):
@@ -41,12 +44,12 @@ def dbf_description_combine(har_code1, har_code2, corr, description, ft_list, d_
     har_code2_d = ''
 
     if har_code1 in d_list:
-        har_code1_d = str(empty_if_nan(har_code1)).lower()
+        har_code1_d = empty_if_nan(har_code1)
     if har_code2 in d_list:
-        har_code2_d = str(empty_if_nan(har_code2)).lower()
+        har_code2_d = empty_if_nan(har_code2)
 
-    corr = str(empty_if_nan(corr)).lower()
-    description = str(empty_if_nan(description)).lower()
+    corr = empty_if_nan(corr)
+    description = empty_if_nan(description)
 
     description_return = f"{har_code1_d}, {har_code2_d}, {description}"
 
@@ -58,4 +61,8 @@ def dbf_description_combine(har_code1, har_code2, corr, description, ft_list, d_
     if description_return[-2:] == ', ':
         description_return = description_return[:-2]
 
-    return str(description_return).capitalize()
+    if len(description_return) > 0:
+        description_return = description_return[0].upper() + description_return[1:]
+
+    return description_return
+

@@ -1,3 +1,4 @@
+import csv
 import os.path
 import pandas as pd
 import numpy as np
@@ -8,6 +9,7 @@ from dimm import dimm
 import errno
 from other_functions import dbf_feature_type_combine
 from other_functions import dbf_description_combine
+import xlwings as xw
 
 """
     #FEA_CODE_REPLACE - столбец прямой конверсии
@@ -72,6 +74,8 @@ class df_DBF:
                 sys.exit()
         try:
             self.df_struct = pd.read_excel(self.struct_filename, sheet_name='STRUCT')
+            self.df_struct_col_var = pd.read_excel(self.struct_filename, sheet_name='COL_VAR')
+            self.df_struct_col_id_formats = pd.read_excel(self.struct_filename, sheet_name='COL_ID_STRUCT')
         except OSError as e:
             if e.errno == errno.EACCES:
                 print("Permission ERROR: STRUCT.xlsx")
@@ -107,6 +111,8 @@ class df_DBF:
         self.df_dbf['#DIMM'] = ''
         self.df_dbf['#DESCR'] = ''
         self.df_dbf['#REMAIN_WT'] = ''
+        self.df_dbf['#ORIENT_HOUR'] = ''
+        self.df_dbf['#BLANK'] = ''
 
         if "#CORR" not in self.df_dbf.columns:
             self.df_dbf['#CORR'] = ''
@@ -119,6 +125,35 @@ class df_DBF:
 
     def get_welds_list(self):
         return self.welds_list
+
+    def parse_columns(self, columns_list, lang='RU'):
+        col_id_list = []
+        column_names = []
+
+        if len(columns_list) > 0:
+            for column_name in columns_list:
+                cname_struct = '#BLANK'
+                col_name = '#BLANK'
+                col_id = '#BLANK'
+
+                for i, row in self.df_struct_col_var.iterrows():
+                    if column_name == self.df_struct_col_var.loc[i]['COL_VAR_NAME']:
+                        cname_struct = self.df_struct_col_var.loc[i]['COL_ID']
+                    elif cname_struct == '':
+                        cname_struct = column_name
+
+                for i, row in self.df_struct_col_id_formats.iterrows():
+                    if cname_struct == self.df_struct_col_id_formats.loc[i]['COL_ID']:
+                        col_id = self.df_struct_col_id_formats.loc[i]['COL_ID']
+                        col_name = self.df_struct_col_id_formats.loc[i][f'COL_NAME_{lang}']
+                    elif col_id == '':
+                        col_id = cname_struct
+                        col_name = cname_struct
+
+                col_id_list.append(col_id)
+                column_names.append(col_name)
+
+        return col_id_list, column_names
 
     def convert_dbf(self, diameter):
 
@@ -172,6 +207,12 @@ class df_DBF:
 
         # конвертирование WT в число
         self.df_dbf['#WT'] = pd.to_numeric(self.df_dbf['#WT'], errors='coerce')
+
+        # конвертируем давление в MPa
+        self.df_dbf['#PSAFE'] = self.df_dbf.loc[self.df_dbf['#PSAFE'] != '', '#PSAFE'] * 0.0980665
+
+        # создание углов в градусах
+        self.df_dbf['#ORIENT_HOUR'] = self.df_dbf.loc[self.df_dbf['#ORIENT_DEG'] != '', '#ORIENT_DEG'] / 720
 
         # глубины вмятина в процентах
         self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.geom_list), '#DEPTH_PRC'] = round(
@@ -253,9 +294,37 @@ class df_DBF:
                 self.df_dbf.loc[i]['#FEATURE_TYPE'] = ID_ROW.loc[1]['TYPE_RU']
 
 
+# сохраняем в csv c custom столбцами
+def to_csv_custom_header(df, csv_path, column_names, csv_encoding):
+    with open(csv_path, 'w') as csvfile:
+        column_names_string = ''
+        for i in column_names:
+            column_names_string = column_names_string + f'"{i}",'
+        # column_names_string = ",".join([str(i) for i in column_names])
+        csvfile.write(f'{column_names_string}\n')
+
+        # write = csv.writer(csvfile)
+        # write.writerow(column_names)
+        # csvfile.write('КонЭц\n')
+
+    df.to_csv(csv_path, header=False, index=False, encoding=csv_encoding, mode="a")
+
+
+# возращаем список который входит в Exist
+def cross_columns_list(list_exist, list_target):
+    cross_columns = []
+    for val in list_target:
+        for val2 in list_exist:
+            if val == val2:
+                cross_columns.append(val)
+    return cross_columns
+
+
 if __name__ == '__main__':
 
     DEBUG = 0
+
+    custom_columns = []
 
     if DEBUG == 1:
         path = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\Test\3nocm.DBF"
@@ -270,6 +339,10 @@ if __name__ == '__main__':
             path = arg
         else:
             path = input("DBF path: ")
+
+            custom_columns = input("Enter columns: ")
+            custom_columns = custom_columns.split('\t')
+            # print(custom_columns)
 
         if path[-3:] != 'DBF' and path[-3:] != 'dbf':
             input("Error: not DBF link")
@@ -307,26 +380,41 @@ if __name__ == '__main__':
     df_dbf = df_DBF(DBF_path=path, lang=lang)
     exp = df_dbf.convert_dbf(diameter=diam)
 
-    exp_format = ['#FEA_NUM', '#JN', '#DIST_START', '#US', '#JL', '#DOC', '#FEATURE', '#FEATURE_TYPE',
-                  '#DESCR', '#LENGTH', '#WIDTH', '#DEPTH_PRC', '#DEPTH_MM', '#ORIENT', '#WT', '#REMAIN_WT', '#DIMM',
-                  '#CLUSTER', '#LOC', '#ERF', '#PSAFE', '#LAT', '#LONG', '#ALT', '#FEA_CODE_REPLACE', '#HAR_CODE1_REPLACE',
-                  '#HAR_CODE2_REPLACE', '#DBF_DESCR']
+    # возвращаем столбец что нашли и их перевод для Кастом
+    custom_columns, custom_columns_names = df_dbf.parse_columns(columns_list=custom_columns, lang=lang)
 
-    exp_format1 = ['#JN', '#FEA_NUM', '#DIST_START', '#JL', '#US', '#DOC', '#FEA_CODE_REPLACE', '#HAR_CODE1_REPLACE',
+    # Thailand
+    exp_format1 = ['#FEA_NUM', '#DIST_START', '#JN', '#US', '#JL', '#FEATURE', '#FEATURE_TYPE', '#DIMM', '#ORIENT_HOUR',
+                   '#WT', '#LENGTH', '#WIDTH', '#DEPTH_PRC', '#DEPTH_MM', '#REMAIN_WT', '#LOC', '#ERF', '#PSAFE',
+                   '#CLUSTER', '#DESCR', '#LAT', '#LONG', '#ALT']
+
+    # orenburg
+    exp_format = ['#FEA_NUM', '#JN', '#DIST_START', '#US', '#JL', '#DOC', '#FEATURE', '#FEATURE_TYPE',
+                  '#DESCR', '#LENGTH', '#WIDTH', '#DEPTH_PRC', '#DEPTH_MM', '#ORIENT_DEG', '#WT', '#REMAIN_WT', '#LOC',
+                  '#DIMM', '#CLUSTER', '#ERF', '#PSAFE', '#LAT', '#LONG', '#ALT']
+
+    # , '#FEA_CODE_REPLACE','#HAR_CODE1_REPLACE', '#HAR_CODE2_REPLACE', '#DBF_DESCR', '#REMARKS'
+
+    exp_format2 = ['#JN', '#FEA_NUM', '#DIST_START', '#JL', '#US', '#DOC', '#FEA_CODE_REPLACE', '#HAR_CODE1_REPLACE',
                    '#HAR_CODE2_REPLACE', '#FEATURE_TYPE', '#DBF_DESCR', "#DESCR", '#CORR', '#ERF', '#CLUSTER',
                    '#PSAFE', '#WT', '#DEPTH_MM', '#DEPTH_PRC', '#AMPL', '#DEPTH_PREV',
-                   '#LENGTH', '#WIDTH', '#ORIENT', '#LOC', '#DIMM', '#LAT', '#LONG', '#ALT']
+                   '#LENGTH', '#WIDTH', '#ORIENT_DEG', '#LOC', '#DIMM', '#LAT', '#LONG', '#ALT']
 
-    total_coluns = exp.columns.values.tolist()
-    cross_columns = []
-    for val in exp_format:
-        for val2 in total_coluns:
-            if val == val2:
-                cross_columns.append(val)
+    total_colums = exp.columns.values.tolist()
 
-    # print(cross_columns)
+    # возвращаем пересечение от шаблона к имеющимся
+    cross_columns = cross_columns_list(total_colums, exp_format)
+    # возвращаем столбец что нашли и их перевод для Дэфолтного
+    cross_columns_return, column_names_cross = df_dbf.parse_columns(columns_list=cross_columns, lang=lang)
 
-    exp1 = exp[cross_columns]
+    custom_columns.append('#DOC')
+    custom_columns_names.append('#DOC')
+    if len(custom_columns) > 1:
+        exp1 = exp[custom_columns]
+        column_names = custom_columns_names
+    else:
+        exp1 = exp[cross_columns]
+        column_names = column_names_cross
 
     # with open(file_path, 'w') as f:
     #    f.write('Custom String\n')
@@ -345,15 +433,20 @@ if __name__ == '__main__':
     else:
         csv_encoding = "utf-8"
     try:
-        exp1.to_csv(exportpath_csv, encoding=csv_encoding, index=False)
+        to_csv_custom_header(df=exp1, csv_path=exportpath_csv, column_names=column_names, csv_encoding=csv_encoding)
+        # exp1.to_csv(exportpath_csv, encoding=csv_encoding, index=False)
+        # xw.Book(exportpath_csv)
+        # xw.view(exportpath_csv, table=False)
         if lang == "SP":
             exp1.to_excel(exportpath_xlsx, encoding=csv_encoding, index=False)
+
     except Exception as PermissionError:
         print(f"'{basename[:-4]}.csv' is opened, saved as '{basename[:-4]}_1.csv'")
         exportpath = os.path.join(absbath, basename)
         exportpath_csv = f'{exportpath[:-4]}_1.csv'
         exportpath_xlsx = f'{exportpath[:-4]}_1.xlsx'
-        exp1.to_csv(exportpath_csv, encoding=csv_encoding, index=False)
+        to_csv_custom_header(df=exp1, csv_path=exportpath_csv, column_names=column_names, csv_encoding=csv_encoding)
+        # exp1.to_csv(exportpath_csv, encoding=csv_encoding, index=False)
         if lang == "SP":
             exp1.to_excel(exportpath_xlsx, encoding=csv_encoding, index=False)
 

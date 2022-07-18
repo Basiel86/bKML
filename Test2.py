@@ -1,4 +1,8 @@
 import pandas as pd
+import xlwings as xw
+from pandasgui import show
+
+
 
 if __name__ == '__main__':
     # Creating dataframe
@@ -12,6 +16,13 @@ if __name__ == '__main__':
 
     z3 = z + z2
 
-    print(z)
-    print(z2)
-    print(z3)
+    print(df1)
+
+    # xw.view(df1, table=False)
+
+    show(df1)
+
+
+
+
+    df1.to_clipboard(index=False)

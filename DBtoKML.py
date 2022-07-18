@@ -315,15 +315,15 @@ class bKML:
         df_DBF['OTH_DESCR'] = df_DBF['#DIST_START'].astype(str) + meter + \
                               '№' + df_DBF['#FEA_NUM'].astype(str) + ' ' + \
                               df_DBF['#FEA_CODE_REPLACE'].astype(str) + ' ' + \
-                              df_DBF['#HAR_CODE1'].astype(str) + ' ' + \
-                              df_DBF['#DESCR'].astype(str)
+                              df_DBF['#HAR_CODE1_REPLACE'].astype(str) + ' ' + \
+                              df_DBF['#DBF_DESCR'].astype(str)
 
         df_DBF['WELD_DESCR'] = ''
         df_DBF.loc[df_DBF['#FEA_CODE'].isin(weld_list), 'WELD_DESCR'] = df_DBF['#DIST_START'].astype(str) + meter + \
                                                                        '#' + df_DBF['#JN'].astype(str) + ', ' + \
                                                                        df_DBF['#FEA_CODE_REPLACE'].astype(str) + ' ' + \
-                                                                       df_DBF['#HAR_CODE1'].astype(str) + ' ' + \
-                                                                       df_DBF['#DESCR'].astype(str)
+                                                                       df_DBF['#HAR_CODE1_REPLACE'].astype(str) + ' ' + \
+                                                                       df_DBF['#DBF_DESCR'].astype(str)
 
         anoms_df = df_DBF.loc[df_DBF['#KML_CLASS'] == 'ANOM']
         anoms_list = anoms_df['#FEA_CODE_REPLACE'].value_counts(ascending=True)
