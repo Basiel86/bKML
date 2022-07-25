@@ -1,4 +1,4 @@
-import csv
+from tkinter import *
 import os.path
 import pandas as pd
 import numpy as np
@@ -117,6 +117,7 @@ class df_DBF:
         if "#CORR" not in self.df_dbf.columns:
             self.df_dbf['#CORR'] = ''
 
+
     def get_ml_list(self):
         return self.ml_list
 
@@ -139,15 +140,15 @@ class df_DBF:
                 for i, row in self.df_struct_col_var.iterrows():
                     if column_name == self.df_struct_col_var.loc[i]['COL_VAR_NAME']:
                         cname_struct = self.df_struct_col_var.loc[i]['COL_ID']
-                    elif cname_struct == '':
+                    elif cname_struct == '#BLANK':
                         cname_struct = column_name
 
                 for i, row in self.df_struct_col_id_formats.iterrows():
                     if cname_struct == self.df_struct_col_id_formats.loc[i]['COL_ID']:
                         col_id = self.df_struct_col_id_formats.loc[i]['COL_ID']
                         col_name = self.df_struct_col_id_formats.loc[i][f'COL_NAME_{lang}']
-                    elif col_id == '':
-                        col_id = cname_struct
+                    elif col_id == '#BLANK':
+                        # col_id = cname_struct
                         col_name = cname_struct
 
                 col_id_list.append(col_id)
@@ -296,6 +297,9 @@ class df_DBF:
 
 # сохраняем в csv c custom столбцами
 def to_csv_custom_header(df, csv_path, column_names, csv_encoding):
+    print(f'Total columns: {len(column_names)}')
+    print(f'Columns list: {column_names}')
+
     with open(csv_path, 'w') as csvfile:
         column_names_string = ''
         for i in column_names:
@@ -342,6 +346,10 @@ if __name__ == '__main__':
 
             custom_columns = input("Enter columns: ")
             custom_columns = custom_columns.split('\t')
+
+            print(f'Columns received: {len(custom_columns)}')
+            print(f'Columns list: {custom_columns}')
+
             # print(custom_columns)
 
         if path[-3:] != 'DBF' and path[-3:] != 'dbf':
@@ -384,31 +392,35 @@ if __name__ == '__main__':
     custom_columns, custom_columns_names = df_dbf.parse_columns(columns_list=custom_columns, lang=lang)
 
     # Thailand
-    exp_format1 = ['#FEA_NUM', '#DIST_START', '#JN', '#US', '#JL', '#FEATURE', '#FEATURE_TYPE', '#DIMM', '#ORIENT_HOUR',
-                   '#WT', '#LENGTH', '#WIDTH', '#DEPTH_PRC', '#DEPTH_MM', '#REMAIN_WT', '#LOC', '#ERF', '#PSAFE',
-                   '#CLUSTER', '#DESCR', '#LAT', '#LONG', '#ALT']
-
-    # orenburg
-    exp_format = ['#FEA_NUM', '#JN', '#DIST_START', '#US', '#JL', '#DOC', '#FEATURE', '#FEATURE_TYPE',
-                  '#DESCR', '#LENGTH', '#WIDTH', '#DEPTH_PRC', '#DEPTH_MM', '#ORIENT_DEG', '#WT', '#REMAIN_WT', '#LOC',
-                  '#DIMM', '#CLUSTER', '#ERF', '#PSAFE', '#LAT', '#LONG', '#ALT']
+    # exp_format1 = ['#FEA_NUM', '#DIST_START', '#JN', '#US', '#JL', '#FEATURE', '#FEATURE_TYPE', '#DIMM', '#ORIENT_HOUR',
+    #               '#WT', '#LENGTH', '#WIDTH', '#DEPTH_PRC', '#DEPTH_MM', '#REMAIN_WT', '#LOC', '#ERF', '#PSAFE',
+    #               '#CLUSTER', '#DESCR', '#LAT', '#LONG', '#ALT']
 
     # , '#FEA_CODE_REPLACE','#HAR_CODE1_REPLACE', '#HAR_CODE2_REPLACE', '#DBF_DESCR', '#REMARKS'
 
-    exp_format2 = ['#JN', '#FEA_NUM', '#DIST_START', '#JL', '#US', '#DOC', '#FEA_CODE_REPLACE', '#HAR_CODE1_REPLACE',
-                   '#HAR_CODE2_REPLACE', '#FEATURE_TYPE', '#DBF_DESCR', "#DESCR", '#CORR', '#ERF', '#CLUSTER',
-                   '#PSAFE', '#WT', '#DEPTH_MM', '#DEPTH_PRC', '#AMPL', '#DEPTH_PREV',
-                   '#LENGTH', '#WIDTH', '#ORIENT_DEG', '#LOC', '#DIMM', '#LAT', '#LONG', '#ALT']
+    # exp_format2 = ['#JN', '#FEA_NUM', '#DIST_START', '#JL', '#US', '#DOC', '#FEA_CODE_REPLACE', '#HAR_CODE1_REPLACE',
+    #               '#HAR_CODE2_REPLACE', '#FEATURE_TYPE', '#DBF_DESCR', "#DESCR", '#CORR', '#ERF', '#CLUSTER',
+    #               '#PSAFE', '#WT', '#DEPTH_MM', '#DEPTH_PRC', '#AMPL', '#DEPTH_PREV',
+    #               '#LENGTH', '#WIDTH', '#ORIENT_DEG', '#LOC', '#DIMM', '#LAT', '#LONG', '#ALT']
 
-    total_colums = exp.columns.values.tolist()
+    # orenburg
+    exp_format = ['#FEA_NUM', '#JN', '#DIST_START', '#US', '#JL', '#DOC', '#FEATURE', '#FEATURE_TYPE',
+                  '#DESCR', '#LENGTH', '#WIDTH', '#DEPTH_PRC', '#DEPTH_MM', '#AMPL', '#DEPTH_PREV', '#ORIENT_DEG',
+                  '#WT', '#REMAIN_WT', '#LOC', '#DIMM', '#CLUSTER', '#ERF', '#PSAFE', '#LAT', '#LONG', '#ALT',
+                  '#FEA_NUM_PREV', '#VTD_NUM', '#YEARS']
+
+    total_columns = exp.columns.values.tolist()
 
     # возвращаем пересечение от шаблона к имеющимся
-    cross_columns = cross_columns_list(total_colums, exp_format)
+    cross_columns = cross_columns_list(total_columns, exp_format)
     # возвращаем столбец что нашли и их перевод для Дэфолтного
     cross_columns_return, column_names_cross = df_dbf.parse_columns(columns_list=cross_columns, lang=lang)
 
+    # добавляем ДОК столбцы в кастом столбцы
     custom_columns.append('#DOC')
     custom_columns_names.append('#DOC')
+
+    # если есть кастом, то экспортим его, в противном случае - шаблон
     if len(custom_columns) > 1:
         exp1 = exp[custom_columns]
         column_names = custom_columns_names
@@ -453,4 +465,4 @@ if __name__ == '__main__':
     if DEBUG != 1:
         input("~~~ Done~~~")
     else:
-        print("~~~ Done~~~")
+        print("~~~ DEBUG Done ~~~")
