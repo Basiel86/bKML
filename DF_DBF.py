@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import sys
 from simpledbf import Dbf5
-from parse_inch import parse_inch
+from parse_inch import parse_inch_prj
 from dimm import dimm
 import errno
 from other_functions import dbf_feature_type_combine
@@ -43,13 +43,21 @@ class df_DBF:
 
         self.lng = lang
         self.dbf_path = DBF_path
-        self.index_filename = resource_path('DBF_INDEX.xlsx')
-        self.struct_filename = resource_path('STRUCT.xlsx')
+
+        index_filename_remote_path = r'd:\WORK\_Templates\PT\DBF_INDEX.xlsx'
+        index_filename_local_path = resource_path(r'IDs\DBF_INDEX.xlsx')
+        if os.path.exists(index_filename_remote_path):
+            self.index_filename = index_filename_remote_path
+            print("#Index file info: Remote Index file")
+        else:
+            self.index_filename = index_filename_local_path
+            print("#Index file info: Local Index file")
+
+        self.struct_filename = resource_path(r'IDs\STRUCT.xlsx')
 
         # Списки из Экселя
         try:
             self.df_index_fea_code = pd.read_excel(self.index_filename, sheet_name='FEA_CODE')
-
             self.df_index_har_code1 = pd.read_excel(self.index_filename, sheet_name='HAR_CODE1')
 
             # списки с описаниями в FT или Description
@@ -68,6 +76,7 @@ class df_DBF:
             self.har_code_d_list = har_code1_d_list_RU + har_code2_d_list_RU + har_code1_d_list_EN + har_code2_d_list_EN
 
             self.df_index_fea_type = pd.read_excel(self.index_filename, sheet_name='FEA_TYPE')
+            self.df_index_rep_method = pd.read_excel(self.index_filename, sheet_name='REP_METHOD')
         except OSError as e:
             if e.errno == errno.EACCES:
                 print("Permission ERROR: DBF_INDEX.xlsx")
@@ -90,6 +99,8 @@ class df_DBF:
         # TYPE_RU
         # FEA_EN
         # TYPE_EN
+
+        print("#DB load status: Loading...")
 
         dbf_raw = Dbf5(self.dbf_path, codec='cp1251')
         self.df_dbf = dbf_raw.to_dataframe()
@@ -116,7 +127,6 @@ class df_DBF:
 
         if "#CORR" not in self.df_dbf.columns:
             self.df_dbf['#CORR'] = ''
-
 
     def get_ml_list(self):
         return self.ml_list
@@ -169,6 +179,7 @@ class df_DBF:
         self.df_replace(self.df_index_har_code1, '#HAR_CODE1_REPLACE')
         self.df_replace(self.df_index_har_code2, '#HAR_CODE2_REPLACE')
         self.df_replace(self.df_index_fea_type, '#LOC')
+        self.df_replace(self.df_index_rep_method, '#REP_METHOD')
 
         # exportpath = r'd:\WORK\OrenburgNeft\NOA 8 inch DNS Olhovskaya to Terminal Service, 19.749 km\Reports\PR\Run3\DB_corr dist\123.csv'
         # self.df_dbf.to_csv(exportpath, encoding='cp1251', index=False)
@@ -245,7 +256,7 @@ class df_DBF:
         try:
             self.df_dbf['#JL'] = self.df_dbf['#JN_Custom'].map(welds_jn_dist_array.set_index('#JN_Custom')['#JL'])
         except Exception as ex:
-            print('no Welds, JL not calculated: ', ex)
+            print('##ERROR: no Welds, JL not calculated: ', ex)
 
         # маска для потерей металла под расчет DIMM
         mask = self.df_dbf['#FEA_CODE'].isin(self.ml_list) & \
@@ -258,9 +269,11 @@ class df_DBF:
                 lambda row: dimm(length=row['#LENGTH'], width=row['#WIDTH'], wt=row['#WT'],
                                  return_format=self.lng), axis=1)
         except Exception as ex:
-            print('no ML for Dimm:', ex)
+            print('##ERROR: no ML for Dimm:', ex)
 
         self.df_dbf = self.df_dbf.replace({'nan': '', 'NaN': '', float('NaN'): '', -1111111: ''})
+
+        print("#DB load status: Loaded successfully!\n")
 
         return self.df_dbf
 
@@ -297,8 +310,8 @@ class df_DBF:
 
 # сохраняем в csv c custom столбцами
 def to_csv_custom_header(df, csv_path, column_names, csv_encoding):
-    print(f'Total columns: {len(column_names)}')
-    print(f'Columns list: {column_names}')
+    print(f'#Custom headers info: Total columns: {len(column_names)}')
+    print(f'Custom headers info: Columns list: {column_names}')
 
     with open(csv_path, 'w') as csvfile:
         column_names_string = ''
@@ -347,18 +360,16 @@ if __name__ == '__main__':
             custom_columns = input("Enter columns: ")
             custom_columns = custom_columns.split('\t')
 
-            print(f'Columns received: {len(custom_columns)}')
-            print(f'Columns list: {custom_columns}')
+            print(f'#ARG columns info: Columns received: {len(custom_columns)}')
+            print(f'#ARG columns info: Columns list: {custom_columns}')
 
             # print(custom_columns)
 
         if path[-3:] != 'DBF' and path[-3:] != 'dbf':
-            input("Error: not DBF link")
+            input("##ERROR: not DBF link")
         else:
-            diam = parse_inch(path)
-            if diam is not None:
-                print('Detected Diam: ', diam, " inch")
-            else:
+            diam = parse_inch_prj(path)
+            if diam is None:
                 diam = input("INCH?: ")
 
             if arg == '':
@@ -384,7 +395,6 @@ if __name__ == '__main__':
             else:
                 lang = "RU"
 
-    print('\nProcess...\n')
     df_dbf = df_DBF(DBF_path=path, lang=lang)
     exp = df_dbf.convert_dbf(diameter=diam)
 
@@ -405,9 +415,10 @@ if __name__ == '__main__':
 
     # orenburg
     exp_format = ['#FEA_NUM', '#JN', '#DIST_START', '#US', '#JL', '#DOC', '#FEATURE', '#FEATURE_TYPE',
-                  '#DESCR', '#LENGTH', '#WIDTH', '#DEPTH_PRC', '#DEPTH_MM', '#AMPL', '#DEPTH_PREV', '#ORIENT_DEG',
+                  '#DESCR', '#LENGTH', '#WIDTH', '#DEPTH_PRC', '#DEPTH_MM', '#AMPL', '#DEPTH_PREV',
+                  '#ORIENT_DEG',
                   '#WT', '#REMAIN_WT', '#LOC', '#DIMM', '#CLUSTER', '#ERF', '#PSAFE', '#LAT', '#LONG', '#ALT',
-                  '#FEA_NUM_PREV', '#VTD_NUM', '#YEARS']
+                  '#FEA_NUM_PREV', '#VTD_NUM', '#FEA_NUM_PREV', '#YEARS']
 
     total_columns = exp.columns.values.tolist()
 

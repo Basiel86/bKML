@@ -1,4 +1,12 @@
-path = r'd:\WORK\#Thailand\NXE inch SRC to LLK, 134 km\Reports\FR'
+import configparser
+import os
+import pandas as pd
+
+inch_mm_df = pd.read_csv(r'IDs\Inch_list.csv')
+inch_names_list = inch_mm_df['Inch_name'].tolist()
+inch_list = inch_mm_df['Inch'].tolist()
+mm_list = inch_mm_df['MM'].tolist()
+inch_dict = dict(zip(inch_names_list, inch_list))
 
 float_inches = {'4': 4.5,
                 '5': 5.563,
@@ -6,6 +14,11 @@ float_inches = {'4': 4.5,
                 '8': 8.625,
                 '10': 10.75,
                 '12': 12.75}
+
+# diam_list = [4, 4.5, 5.563, 6.625, 8.625, 10.75, 12.75, 14, 16, 18, 20, 21, 22, 24, 26, 28, 30, 32, 34, 36, 38,
+#              40, 42, 44, 46, 48, 52, 56]
+
+config = configparser.ConfigParser()
 
 
 def isfloat(num):
@@ -16,7 +29,46 @@ def isfloat(num):
         return False
 
 
-def parse_inch(file_path):
+def parse_inch_prj(file_path):
+    abspath = os.path.dirname(file_path)
+    if os.path.exists(abspath):
+        for filename in os.listdir(abspath):
+            try:
+                if ".prj" in filename:
+                    config.read(os.path.join(abspath, filename))
+                    # переменная с диаметром
+                    diam_var = float(config['PARAMETERS']['PipeDiameter'])
+                    # 1 - inch / 0 - мм
+                    inch_or_mm = int(config['PARAMETERS']['DiameterDim'])
+
+                    if inch_or_mm == 0:
+                        diam_var_inch = round(diam_var / 25.4, 3)
+                        result_inch = get_close_inch(diam_var_inch)
+                        if diam_var_inch < result_inch:
+                            print(
+                                f"\n### Attention: No required Inch in InchList: PRJ={diam_var_inch} but Closest={result_inch} ###\n")
+                    else:
+                        result_inch = get_close_inch(diam_var)
+                        # проверяем на корректность Инча в проекте
+                        if diam_var not in inch_list:
+                            print(
+                                f"\n### Attention: Wrong Inch in PRJ file: PRJ={diam_var} but Closest={result_inch} ###\n")
+
+                    print(f"# Inch parser (PRJ): {result_inch} inch")
+                    return result_inch
+            except KeyError:
+                print(f"### ERROR Inch parser (PRJ): No PipeDiameter in PRJ file")
+                return None
+        return None
+
+
+# возвращаем ближайший инч из списка
+def get_close_inch(inch_val):
+    closest_inch = min(inch_list, key=lambda x: abs(x - inch_val))
+    return closest_inch
+
+
+def parse_inch_path(file_path):
     file_path = file_path.replace('  ', ' ')
 
     inch_loc = file_path.find('inch')
@@ -34,19 +86,53 @@ def parse_inch(file_path):
     try:
         inv_inch = inv_inch[::-1]
     except Exception as ex:
-        print("Parse inch Error: inch found but No Diam /", ex)
+        # print("Parse inch Error: inch found but No Diam value /", ex)
         return None
 
     if isfloat(inv_inch):
         if inv_inch in float_inches:
-            return float_inches[inv_inch]
-        return inv_inch
+            return get_close_inch(float_inches[inv_inch])
+        return get_close_inch(float(inv_inch))
     else:
         return None
 
 
-if __name__ == '__main__':
+def get_inch_dict():
+    return inch_dict
 
-    path = r"z:\Projects\Russia\Orenburgneft\NOD 10 inch ННП ДНС Рыбкинская-УПН Загорская 2 й участок, 24.5 km\Reports\FR\2021.12\Database"
-    inch = parse_inch(path)
-    print(inch)
+
+def get_inch_list():
+    return inch_list
+
+
+def get_inch_names_list():
+    return inch_names_list
+
+
+def parse_inch_combine(file_path):
+    inch_of_path = parse_inch_path(file_path)
+    inch_of_prj = parse_inch_prj(file_path)
+
+    if inch_of_prj is None and inch_of_path is None:
+        return None
+    if inch_of_prj is None:
+        print("#inch parser: Inch from Path")
+        return inch_of_path
+    else:
+        print("#inch parser: Inch from PRJ")
+        return inch_of_prj
+
+
+if __name__ == '__main__':
+    path = r"d:\WORK\SalymPetroleum\NWA 20 inch UPN-PSN, 88 km\Reports\FR\Database\1nwam.DBF"
+
+    inch2 = parse_inch_prj(path)
+
+    print(inch_list.index(inch2))
+
+
+    # print("of Comb: ", end='')
+    # inch3 = parse_inch_combine(path)
+    # print(inch3)
+
+    # print(get_inch_dict()[inch3])

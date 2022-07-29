@@ -5,6 +5,13 @@ import numpy as np
 import sys
 import os
 
+from difflib import SequenceMatcher
+import jellyfish
+
+
+def similar(a, b):
+    return SequenceMatcher(None, a, b).ratio()
+
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -17,7 +24,7 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
-struct_filename = resource_path('STRUCT.xlsx')
+struct_filename = resource_path(r'IDs\STRUCT.xlsx')
 
 df_struct_col_var = pd.read_excel(struct_filename, sheet_name='COL_VAR')
 df_struct_col_id_formats = pd.read_excel(struct_filename, sheet_name='COL_ID_STRUCT')
@@ -57,12 +64,26 @@ if __name__ == '__main__':
     cname = ['Depth, mm', 'WTF1', "Orientation o'clock"]
     lang = 'RU'
 
-    cname = input("Enter columns: ")
+    # cname = input("Enter columns: ")
+
+    cname = '№ особ.	Дист., м	Отн. дист., м.	Длина секции, м	№ секции	Особенность	Описание	Комментарий	Т. ст., мм	Угол, °	Тип	Класс	ERF ASME B31G	P безоп. ASME B31G (МПа)	Длина, мм	Ширина, мм	Глуб., % от WT/Dн	Ост. т. ст., мм	Кластер	Срок ремонта особенности, лет	Широта, °	Долгота, °	Высота, м	Дист., м	Отн. дист., м.'
 
     cname = cname.split('\t')
 
     cname = parse_columns(columns_list=cname, lang=lang)
 
-    print(cname[1])
+    a = 'Отн. дист м.'
 
+    b = 'дист м.'
+    c = 'дист. отн. м'
 
+    print(jellyfish.levenshtein_distance(a, b))
+    print(jellyfish.levenshtein_distance(a, c))
+
+    print(jellyfish.hamming_distance(a, b))
+    print(jellyfish.hamming_distance(a, c))
+
+    print(similar(a, b))
+    print(similar(a, c))
+
+    # print(cname[1])

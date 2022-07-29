@@ -3,13 +3,20 @@ import os
 import DBtoKML
 from tkinter import filedialog as fd
 from datetime import datetime, date
+import pandas as pd
 
 EXP_DAY = '2022-08-06'
 
 lng_list = ["RU", "EN"]
 dbf_ext_list = ['dbf', 'DBF']
-diam_list = [4, 4.5, 5.563, 6.625, 8.625, 10.75, 12.75, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38,
-             40, 42, 44, 46, 48, 52, 56]
+
+inch_mm_df = pd.read_csv(r'IDs\Inch_list.csv')
+diam_list = inch_mm_df['Inch_name'].tolist()
+mm_list = inch_mm_df['Inch'].tolist()
+inch_dict = dict(zip(diam_list, mm_list))
+
+# diam_list = [4, 4.5, 5.563, 6.625, 8.625, 10.75, 12.75, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38,
+#              40, 42, 44, 46, 48, 52, 56]
 
 
 def write_log(filepath=""):
@@ -40,7 +47,9 @@ def DBFtoKML():
     dbf_path = str(myTextbox.get())
 
     lng = str(lng_list_variable.get())
-    diameter = float(diam_list_variable.get())
+
+    diam_list_value = diam_list_variable.get()
+    diameter = inch_dict[diam_list_value]
 
     if dbf_path != "" and dbf_path[-3:] in dbf_ext_list:
 
@@ -119,15 +128,15 @@ if exp_date_formatted >= now_date:
     # fileButon.place(x=270, y=42)
 
     blankLabel = Label(userForm, text="          ")
-    blankLabel.pack(side='left');
+    blankLabel.pack(side='left')
 
     inchLabel = Label(userForm, text="Diam")
-    inchLabel.pack(side='left');
+    inchLabel.pack(side='left')
 
     diam_list_variable = StringVar(userForm)
     diam_combobox = OptionMenu(userForm, diam_list_variable, *diam_list)
     diam_combobox.pack(side='left')
-    diam_list_variable.set(diam_list[4])
+    diam_list_variable.set(diam_list[6])
 
 
     def on_closing():

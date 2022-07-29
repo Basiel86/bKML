@@ -1,4 +1,6 @@
 import os
+
+import parse_inch
 from DF_DBF import *
 from tkinter import filedialog as fd
 from datetime import datetime, date
@@ -6,6 +8,7 @@ import pandas as pd
 import tkinter as tk
 from tkinter import ttk
 from ttkwidgets import CheckboxTreeview
+from parse_inch import parse_inch_prj
 
 
 class DB_FORM:
@@ -16,8 +19,12 @@ class DB_FORM:
 
         self.lang_list = ["RU", "EN"]
         self.dbf_ext_list = ['dbf', 'DBF']
-        self.diam_list = [4, 4.5, 5.563, 6.625, 8.625, 10.75, 12.75, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38,
-                          40, 42, 44, 46, 48, 52, 56]
+
+        self.inch_names_list = parse_inch.get_inch_names_list()
+        self.inch_list = parse_inch.get_inch_list()
+        self.inch_dict = parse_inch.get_inch_dict()
+        # self.diam_list = [4, 4.5, 5.563, 6.625, 8.625, 10.75, 12.75, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38,
+        #                   40, 42, 44, 46, 48, 52, 56]
 
         self.df_dbf_class = df_DBF
         self.db_df = pd.DataFrame
@@ -44,7 +51,7 @@ class DB_FORM:
         self.diam_label = Label(self.db_process_form, text="Diam")
 
         self.diam_list_variable = StringVar(self.db_process_form)
-        self.diam_combobox = OptionMenu(self.db_process_form, self.diam_list_variable, *self.diam_list)
+        self.diam_combobox = OptionMenu(self.db_process_form, self.diam_list_variable, *self.inch_names_list)
 
         self.stat_tree = CheckboxTreeview(self.db_process_form, show='tree', column="c1")  # hide tree headings
         self.stat_tree.column("# 1", anchor='center', stretch='YES', width=60)
@@ -78,7 +85,7 @@ class DB_FORM:
         now_date = date.today()
         days_left = exp_date_formatted - now_date
 
-        ico_abs_path = resource_path('KML.ico')
+        ico_abs_path = resource_path('DBF_icon.ico')
         self.db_process_form.wm_iconbitmap(ico_abs_path)
 
         if exp_date_formatted >= now_date:
@@ -86,16 +93,16 @@ class DB_FORM:
             self.db_process_form.title("DB process")
             self.db_process_form.geometry("1090x220")
 
-            self.diam_label.place(x=25, y=5)
-            self.diam_combobox.place(x=10, y=22)
-            self.lang_combobox.place(x=80, y=22)
-            self.path_label.place(x=150, y=5)
-            self.path_textbox.place(x=150, y=28)
+            self.lang_combobox.place(x=10, y=22)
+            self.diam_label.place(x=150, y=4)
+            self.diam_combobox.place(x=70, y=22)
+            self.path_label.place(x=320, y=33)
+            self.path_textbox.place(x=150, y=57)
 
             self.file_open_button.place(x=10, y=55)
-            self.load_db_button.place(x=80, y=55)
+            self.load_db_button.place(x=75, y=55)
 
-            self.columns_label.place(x=150, y=80)
+            self.columns_label.place(x=320, y=80)
             self.columns_textbox.place(x=150, y=104)
             self.export_db_button.place(x=10, y=100)
             self.clipboard_db_button.place(x=75, y=100)
@@ -106,11 +113,19 @@ class DB_FORM:
             self.scroll_pane.pack(side=tk.RIGHT, fill=tk.Y)
             self.doc_tree.place(x=870, y=10)
 
-            if arg != '':
-                self.path_variable.set(arg)
-
             self.lang_list_variable.set(self.lang_list[0])
-            self.diam_list_variable.set(self.diam_list[4])
+
+            if arg != '':
+                # пишем аргумент в строку пути
+                self.path_variable.set(arg)
+                # парсим инч
+                arg_inch = parse_inch_prj(arg)
+                # если нашли инч то селектим его в выпадающем списке
+                if arg_inch is not None:
+                    inch_index = self.inch_list.index(arg_inch)
+                    self.diam_list_variable.set(self.inch_names_list[inch_index])
+            else:
+                self.diam_list_variable.set(self.inch_names_list[6])
 
             # self.blankLabel.pack(side='left')
 
@@ -184,12 +199,12 @@ class DB_FORM:
         db_path = str(self.path_textbox.get())
 
         lng = str(self.lang_list_variable.get())
-        diameter = float(self.diam_list_variable.get())
+        diam_list_value = self.diam_list_variable.get()
+        diameter = self.inch_dict[diam_list_value]
 
         if db_path != "" and db_path[-3:] in self.dbf_ext_list:
 
             try:
-                print("\nProcessing....")
 
                 self.df_dbf_class = df_DBF(DBF_path=db_path, lang=lng)
                 self.db_df = self.df_dbf_class.convert_dbf(diameter=diameter)
@@ -223,6 +238,12 @@ class DB_FORM:
 
         self.path_variable.set(filename)
 
+        path_inch = parse_inch_prj(filename)
+        # если нашли инч то селектим его в выпадающем списке
+        if path_inch is not None:
+            inch_index = self.inch_list.index(path_inch)
+            self.diam_list_variable.set(self.inch_names_list[inch_index])
+
     @staticmethod
     def resource_path(relative_path):
         try:
@@ -250,7 +271,7 @@ class DB_FORM:
                           '#DESCR', '#LENGTH', '#WIDTH', '#DEPTH_PRC', '#DEPTH_MM', '#AMPL', '#DEPTH_PREV',
                           '#ORIENT_DEG',
                           '#WT', '#REMAIN_WT', '#LOC', '#DIMM', '#CLUSTER', '#ERF', '#PSAFE', '#LAT', '#LONG', '#ALT',
-                          '#FEA_NUM_PREV', '#VTD_NUM', '#YEARS']
+                          '#FEA_NUM_PREV', '#VTD_NUM', '#FEA_NUM_PREV', '#YEARS']
 
             total_columns = self.db_df.columns.values.tolist()
 
@@ -270,23 +291,28 @@ class DB_FORM:
                 checked_items_fea.append(self.stat_tree.item(item, "text"))
             # если список не пустой, фильтруем чекнутые
             if len(checked_items_fea) != 0:
-                self.db_df = self.db_df[self.db_df['#FEATURE'].isin(checked_items_fea)]
+                self.db_df_from_tree = self.db_df[self.db_df['#FEATURE'].isin(checked_items_fea)]
             # проверяем на наличие кликнутых в дереве документированных
             checked_items_doc = []
             for item in self.doc_tree.get_checked():
                 checked_items_doc.append(self.doc_tree.item(item, "text"))
             if len(checked_items_doc) != 0:
-                self.db_df = self.db_df[self.db_df['#DOC'].isin(checked_items_doc)]
+                self.db_df_from_tree = self.db_df[self.db_df['#DOC'].isin(checked_items_doc)]
 
             # возвращаем пересечение от шаблона к имеющимся
             custom_columns = cross_columns_list(total_columns, custom_columns)
 
+            if checked_items_fea == [] and checked_items_doc == []:
+                df_for_export = self.db_df
+            else:
+                df_for_export = self.db_df_from_tree
+
             # если есть кастом, то экспортим его, в противном случае - шаблон
             if len(custom_columns) > 2:
-                exp1 = self.db_df[custom_columns]
+                exp1 = df_for_export[custom_columns]
                 column_names = custom_columns_names
             else:
-                exp1 = self.db_df[cross_columns]
+                exp1 = df_for_export[cross_columns]
                 column_names = column_names_cross
 
             # with open(file_path, 'w') as f:
@@ -297,6 +323,7 @@ class DB_FORM:
 
             if to_clipboard:
                 exp1.to_clipboard(sep=',', index=False)
+                # exp1.to_clipboard(index=False)
             else:
                 absbath = os.path.dirname(path)
                 basename = os.path.basename(path)
