@@ -5,11 +5,14 @@ import numpy as np
 import sys
 from simpledbf import Dbf5
 from parse_inch import parse_inch_prj
+from parse_inch import parse_inch_path
 from dimm import dimm
 import errno
 from other_functions import dbf_feature_type_combine
 from other_functions import dbf_description_combine
-import xlwings as xw
+
+# столбцы для дэфолтного экспорта
+from Export_columns import exp_format
 
 """
     #FEA_CODE_REPLACE - столбец прямой конверсии
@@ -44,14 +47,14 @@ class df_DBF:
         self.lng = lang
         self.dbf_path = DBF_path
 
-        index_filename_remote_path = r'd:\WORK\_Templates\PT\DBF_INDEX.xlsx'
+        index_filename_remote_path = resource_path(r'd:\WORK\_Templates\PT\DBF_INDEX.xlsx')
         index_filename_local_path = resource_path(r'IDs\DBF_INDEX.xlsx')
         if os.path.exists(index_filename_remote_path):
             self.index_filename = index_filename_remote_path
-            print("#Index file info: Remote Index file")
+            print("# Index file info: Remote")
         else:
             self.index_filename = index_filename_local_path
-            print("#Index file info: Local Index file")
+            print("# Index file info: Local")
 
         self.struct_filename = resource_path(r'IDs\STRUCT.xlsx')
 
@@ -79,7 +82,7 @@ class df_DBF:
             self.df_index_rep_method = pd.read_excel(self.index_filename, sheet_name='REP_METHOD')
         except OSError as e:
             if e.errno == errno.EACCES:
-                print("Permission ERROR: DBF_INDEX.xlsx")
+                print("# Permission ERROR: DBF_INDEX.xlsx")
                 sys.exit()
         try:
             self.df_struct = pd.read_excel(self.struct_filename, sheet_name='STRUCT')
@@ -87,7 +90,7 @@ class df_DBF:
             self.df_struct_col_id_formats = pd.read_excel(self.struct_filename, sheet_name='COL_ID_STRUCT')
         except OSError as e:
             if e.errno == errno.EACCES:
-                print("Permission ERROR: STRUCT.xlsx")
+                print("# Permission ERROR: STRUCT.xlsx")
                 sys.exit()
 
         self.ml_list = self.df_index_fea_code.loc[self.df_index_fea_code['KML_D_TYPE'] == 'ML', 'ID']
@@ -100,7 +103,7 @@ class df_DBF:
         # FEA_EN
         # TYPE_EN
 
-        print("#DB load status: Loading...")
+        print("# DB load status: Loading...")
 
         dbf_raw = Dbf5(self.dbf_path, codec='cp1251')
         self.df_dbf = dbf_raw.to_dataframe()
@@ -127,6 +130,9 @@ class df_DBF:
 
         if "#CORR" not in self.df_dbf.columns:
             self.df_dbf['#CORR'] = ''
+
+    def get_color_type_df(self, lng):
+        return self.df_index_fea_code[['COLOR_TYPE', f'FEA_{lng}']]
 
     def get_ml_list(self):
         return self.ml_list
@@ -159,7 +165,8 @@ class df_DBF:
                         col_name = self.df_struct_col_id_formats.loc[i][f'COL_NAME_{lang}']
                     elif col_id == '#BLANK':
                         # col_id = cname_struct
-                        col_name = cname_struct
+                        # col_name = cname_struct
+                        col_name = '#BLANK'
 
                 col_id_list.append(col_id)
                 column_names.append(col_name)
@@ -256,7 +263,7 @@ class df_DBF:
         try:
             self.df_dbf['#JL'] = self.df_dbf['#JN_Custom'].map(welds_jn_dist_array.set_index('#JN_Custom')['#JL'])
         except Exception as ex:
-            print('##ERROR: no Welds, JL not calculated: ', ex)
+            print('## ERROR: no Welds, JL not calculated: ', ex)
 
         # маска для потерей металла под расчет DIMM
         mask = self.df_dbf['#FEA_CODE'].isin(self.ml_list) & \
@@ -269,11 +276,11 @@ class df_DBF:
                 lambda row: dimm(length=row['#LENGTH'], width=row['#WIDTH'], wt=row['#WT'],
                                  return_format=self.lng), axis=1)
         except Exception as ex:
-            print('##ERROR: no ML for Dimm:', ex)
+            print('## ERROR: no ML for Dimm:', ex)
 
         self.df_dbf = self.df_dbf.replace({'nan': '', 'NaN': '', float('NaN'): '', -1111111: ''})
 
-        print("#DB load status: Loaded successfully!\n")
+        print("# DB load status: Loaded successfully!\n")
 
         return self.df_dbf
 
@@ -310,8 +317,8 @@ class df_DBF:
 
 # сохраняем в csv c custom столбцами
 def to_csv_custom_header(df, csv_path, column_names, csv_encoding):
-    print(f'#Custom headers info: Total columns: {len(column_names)}')
-    print(f'Custom headers info: Columns list: {column_names}')
+    print(f'# Custom headers info: Total columns: {len(column_names)}')
+    # print(f'# Custom headers info: Columns list: {column_names}')
 
     with open(csv_path, 'w') as csvfile:
         column_names_string = ''
@@ -341,12 +348,13 @@ if __name__ == '__main__':
 
     DEBUG = 0
 
+    # дэфолтные
+    diam = None
+    lang = "RU"
     custom_columns = []
 
     if DEBUG == 1:
         path = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\Test\3nocm.DBF"
-        lang = "RU"
-        diam = 254
     else:
         arg = ''
         for arg in sys.argv[1:]:
@@ -360,33 +368,42 @@ if __name__ == '__main__':
             custom_columns = input("Enter columns: ")
             custom_columns = custom_columns.split('\t')
 
-            print(f'#ARG columns info: Columns received: {len(custom_columns)}')
-            print(f'#ARG columns info: Columns list: {custom_columns}')
+            print(f'# ARG columns info: Columns received: {len(custom_columns)}')
+            print(f'# ARG columns info: Columns list: {custom_columns}')
 
             # print(custom_columns)
 
         if path[-3:] != 'DBF' and path[-3:] != 'dbf':
             input("##ERROR: not DBF link")
         else:
+            # проверяем на наличие дюйма по проекту
             diam = parse_inch_prj(path)
+            # если не нашли то ищем на всякий в проекте в папке выше (если под папка рабочих)
             if diam is None:
-                diam = input("INCH?: ")
+                diam = parse_inch_prj(os.path.dirname(path))
+
+            # если не нашли - просим ввести дюймаж
+            if diam is None:
+                # просим ввести дюймаж
+                diam = input('Enter Diameter (Inch/mm)?: ')
+                # если что-то ввели то поверяем на дюйм/мм и домножаем
+                if diam != '':
+                    diam = float(diam)
+                    if diam > 100:
+                        diam = diam / 25.4
+                # если ввели пустоту
+                else:
+                    # ищем дюймаж в пути файла
+                    diam = parse_inch_path(path)
+                    # если и в пути нет, то пишем дефолтный
+                    if diam is None:
+                        print("# Default diameter = 8.625 inch")
+                        diam = 8.625
 
             if arg == '':
                 lang = input("'1/2' for EN/SP?: ")
             else:
                 lang = "EN"
-
-            # path = r"WORK_DBF\1nhdm.DBF"
-            # diam = 10.75
-            # lang = 'RU'
-            if diam == '':
-                diam = 1
-            else:
-                diam = float(diam)
-
-            if diam < 100:
-                diam = diam * 25.4
 
             if lang == '1':
                 lang = "EN"
@@ -414,11 +431,6 @@ if __name__ == '__main__':
     #               '#LENGTH', '#WIDTH', '#ORIENT_DEG', '#LOC', '#DIMM', '#LAT', '#LONG', '#ALT']
 
     # orenburg
-    exp_format = ['#FEA_NUM', '#JN', '#DIST_START', '#US', '#JL', '#DOC', '#FEATURE', '#FEATURE_TYPE',
-                  '#DESCR', '#LENGTH', '#WIDTH', '#DEPTH_PRC', '#DEPTH_MM', '#AMPL', '#DEPTH_PREV',
-                  '#ORIENT_DEG',
-                  '#WT', '#REMAIN_WT', '#LOC', '#DIMM', '#CLUSTER', '#ERF', '#PSAFE', '#LAT', '#LONG', '#ALT',
-                  '#FEA_NUM_PREV', '#VTD_NUM', '#FEA_NUM_PREV', '#YEARS']
 
     total_columns = exp.columns.values.tolist()
 

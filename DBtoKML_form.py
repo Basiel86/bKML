@@ -4,16 +4,24 @@ import DBtoKML
 from tkinter import filedialog as fd
 from datetime import datetime, date
 import pandas as pd
+import parse_inch
+from parse_inch import parse_inch_prj
+import traceback
 
-EXP_DAY = '2022-08-06'
+
+
+EXP_DAY = '2022-08-20'
 
 lng_list = ["RU", "EN"]
 dbf_ext_list = ['dbf', 'DBF']
 
-inch_mm_df = pd.read_csv(r'IDs\Inch_list.csv')
-diam_list = inch_mm_df['Inch_name'].tolist()
-mm_list = inch_mm_df['Inch'].tolist()
-inch_dict = dict(zip(diam_list, mm_list))
+
+# diam_list = inch_mm_df['Inch_name'].tolist()
+# mm_list = inch_mm_df['Inch'].tolist()
+
+inch_names_list = parse_inch.get_inch_names_list()
+inch_list = parse_inch.get_inch_list()
+inch_dict = parse_inch.get_inch_dict()
 
 # diam_list = [4, 4.5, 5.563, 6.625, 8.625, 10.75, 12.75, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38,
 #              40, 42, 44, 46, 48, 52, 56]
@@ -44,7 +52,7 @@ def write_log(filepath=""):
 
 
 def DBFtoKML():
-    dbf_path = str(myTextbox.get())
+    dbf_path = str(path_textbox.get())
 
     lng = str(lng_list_variable.get())
 
@@ -54,7 +62,6 @@ def DBFtoKML():
     if dbf_path != "" and dbf_path[-3:] in dbf_ext_list:
 
         try:
-            print("\nProcessing....")
             DBtoKML.bKML(dbf_path=dbf_path, lang=lng, diameter=diameter).dbf_to_kml()
             try:
                 write_log(filepath=dbf_path)
@@ -74,7 +81,13 @@ def openfile():
         initialdir='/',
         filetypes=[("DBF files", ".dbf .DBF")])
 
-    textEntry.set(filename)
+    path_variable.set(filename)
+
+    path_inch = parse_inch_prj(filename)
+    # если нашли инч то селектим его в выпадающем списке
+    if path_inch is not None:
+        inch_index = inch_list.index(path_inch)
+        diam_list_variable.set(inch_names_list[inch_index])
 
 
 def resource_path(relative_path):
@@ -106,14 +119,12 @@ if exp_date_formatted >= now_date:
     userForm.geometry("600x70")
 
     myLabel = Label(userForm, text="DBF файл")
-    myLabel.pack();
+    myLabel.pack()
 
-    textEntry = StringVar(userForm)
-    myTextbox = Entry(userForm, width=580, textvariable=textEntry)
-    myTextbox.pack();
+    path_variable = StringVar(userForm)
+    path_textbox = Entry(userForm, width=98, textvariable=path_variable)
+    path_textbox.pack()
 
-    if arg != '':
-        textEntry.set(arg)
 
     myButon = Button(userForm, text="DBF to KML", command=DBFtoKML)
     myButon.pack(side='left')
@@ -134,9 +145,24 @@ if exp_date_formatted >= now_date:
     inchLabel.pack(side='left')
 
     diam_list_variable = StringVar(userForm)
-    diam_combobox = OptionMenu(userForm, diam_list_variable, *diam_list)
+    diam_combobox = OptionMenu(userForm, diam_list_variable, *inch_names_list)
     diam_combobox.pack(side='left')
-    diam_list_variable.set(diam_list[6])
+
+    if arg != '':
+        path_variable.set(arg)
+        # пишем аргумент в строку пути
+        path_variable.set(arg)
+        # парсим инч
+        arg_inch = parse_inch_prj(arg)
+        # если нашли инч то селектим его в выпадающем списке
+        if arg_inch is not None:
+            inch_index = inch_list.index(arg_inch)
+            diam_list_variable.set(inch_names_list[inch_index])
+        else:
+            diam_list_variable.set(inch_names_list[6])
+    else:
+        diam_list_variable.set(inch_names_list[6])
+
 
 
     def on_closing():

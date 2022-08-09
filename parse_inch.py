@@ -1,8 +1,23 @@
 import configparser
 import os
 import pandas as pd
+import sys
 
-inch_mm_df = pd.read_csv(r'IDs\Inch_list.csv')
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception as ex:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+
+inch_list_path = resource_path(r'IDs\Inch_list.csv')
+
+inch_mm_df = pd.read_csv(inch_list_path)
 inch_names_list = inch_mm_df['Inch_name'].tolist()
 inch_list = inch_mm_df['Inch'].tolist()
 mm_list = inch_mm_df['MM'].tolist()
@@ -15,8 +30,6 @@ float_inches = {'4': 4.5,
                 '10': 10.75,
                 '12': 12.75}
 
-# diam_list = [4, 4.5, 5.563, 6.625, 8.625, 10.75, 12.75, 14, 16, 18, 20, 21, 22, 24, 26, 28, 30, 32, 34, 36, 38,
-#              40, 42, 44, 46, 48, 52, 56]
 
 config = configparser.ConfigParser()
 
@@ -29,6 +42,7 @@ def isfloat(num):
         return False
 
 
+# парсинг инча из файла проектов (PRJ)
 def parse_inch_prj(file_path):
     abspath = os.path.dirname(file_path)
     if os.path.exists(abspath):
@@ -68,6 +82,7 @@ def get_close_inch(inch_val):
     return closest_inch
 
 
+# парсинг инча из пути к файлу
 def parse_inch_path(file_path):
     file_path = file_path.replace('  ', ' ')
 
@@ -91,8 +106,13 @@ def parse_inch_path(file_path):
 
     if isfloat(inv_inch):
         if inv_inch in float_inches:
-            return get_close_inch(float_inches[inv_inch])
-        return get_close_inch(float(inv_inch))
+            result_inch = get_close_inch(float_inches[inv_inch])
+            print(f"# Inch parser (Path): {result_inch} inch")
+            return result_inch
+
+        result_inch = get_close_inch(float(inv_inch))
+        print(f"# Inch parser (Path): {result_inch} inch")
+        return result_inch
     else:
         return None
 
@@ -123,6 +143,8 @@ def parse_inch_combine(file_path):
         return inch_of_prj
 
 
+
+
 if __name__ == '__main__':
     path = r"d:\WORK\SalymPetroleum\NWA 20 inch UPN-PSN, 88 km\Reports\FR\Database\1nwam.DBF"
 
@@ -131,8 +153,3 @@ if __name__ == '__main__':
     print(inch_list.index(inch2))
 
 
-    # print("of Comb: ", end='')
-    # inch3 = parse_inch_combine(path)
-    # print(inch3)
-
-    # print(get_inch_dict()[inch3])
