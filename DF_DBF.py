@@ -14,9 +14,10 @@ from other_functions import dbf_description_combine
 # столбцы для дэфолтного экспорта
 from Export_columns import exp_format
 
-"""
-    #FEA_CODE_REPLACE - столбец прямой конверсии
-"""
+index_filename_remote_path = r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\DBF_INDEX.xlsx'
+index_filename_local_path = r'IDs\DBF_INDEX.xlsx'
+struct_filename_remote_path = r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\STRUCT.xlsx'
+struct_filename_local_path = r'IDs\STRUCT.xlsx'
 
 
 def same_as_upper(col: pd.Series) -> pd.Series:
@@ -41,23 +42,27 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
+# Берем версию с компа или удаленно
+def remote_or_local(remote_path, local_path):
+    filename = os.path.basename(remote_path)[:-5]
+    if os.path.exists(remote_path):
+        print(f"# Info: {filename} file info: Remote")
+        return remote_path
+    else:
+        print(f"# Info: {filename} file info: Local")
+        return local_path
+
+
 class df_DBF:
-    def __init__(self, DBF_path, lang="RU"):
+    def __init__(self):
 
-        self.lng = lang
-        self.dbf_path = DBF_path
+        self.dbf_path = ''
+        self.lng = 'RU'
 
-        index_filename_remote_path = resource_path(r'd:\WORK\_Templates\PT\DBF_INDEX.xlsx')
-        index_filename_local_path = resource_path(r'IDs\DBF_INDEX.xlsx')
-        if os.path.exists(index_filename_remote_path):
-            self.index_filename = index_filename_remote_path
-            print("# Index file info: Remote")
-        else:
-            self.index_filename = index_filename_local_path
-            print("# Index file info: Local")
-
-        self.struct_filename = resource_path(r'IDs\STRUCT.xlsx')
-
+        self.index_filename = remote_or_local(remote_path=index_filename_remote_path,
+                                              local_path=index_filename_local_path)
+        self.struct_filename = remote_or_local(remote_path=struct_filename_remote_path,
+                                               local_path=struct_filename_local_path)
         # Списки из Экселя
         try:
             self.df_index_fea_code = pd.read_excel(self.index_filename, sheet_name='FEA_CODE')
@@ -103,9 +108,13 @@ class df_DBF:
         # FEA_EN
         # TYPE_EN
 
+    def load_dbf(self, dbf_path):
+
+        self.dbf_path = dbf_path
+
         print("# DB load status: Loading...")
 
-        dbf_raw = Dbf5(self.dbf_path, codec='cp1251')
+        dbf_raw = Dbf5(dbf_path, codec='cp1251')
         self.df_dbf = dbf_raw.to_dataframe()
 
         # переименовываем столбцы
@@ -124,7 +133,7 @@ class df_DBF:
         self.df_dbf['#JL'] = ''
         self.df_dbf['#DIMM'] = ''
         self.df_dbf['#DESCR'] = ''
-        self.df_dbf['#REMAIN_WT'] = ''
+        # self.df_dbf['#REMAIN_WT'] = ''
         self.df_dbf['#ORIENT_HOUR'] = ''
         self.df_dbf['#BLANK'] = ''
 
@@ -143,7 +152,13 @@ class df_DBF:
     def get_welds_list(self):
         return self.welds_list
 
-    def parse_columns(self, columns_list, lang='RU'):
+    def parse_columns(self, columns_list, ret_blank=True):
+
+        """
+        Получаем лист названий столбцов и возвращем соотвтствие их ID к Описанию
+        ret_blank - если столбец не найден - возвращяем BLANK или оставляем искомое имя
+        """
+
         col_id_list = []
         column_names = []
 
@@ -162,18 +177,23 @@ class df_DBF:
                 for i, row in self.df_struct_col_id_formats.iterrows():
                     if cname_struct == self.df_struct_col_id_formats.loc[i]['COL_ID']:
                         col_id = self.df_struct_col_id_formats.loc[i]['COL_ID']
-                        col_name = self.df_struct_col_id_formats.loc[i][f'COL_NAME_{lang}']
+                        col_name = self.df_struct_col_id_formats.loc[i][f'COL_NAME_{self.lng}']
                     elif col_id == '#BLANK':
-                        # col_id = cname_struct
-                        # col_name = cname_struct
-                        col_name = '#BLANK'
+                        if ret_blank:
+                            col_name = '#BLANK'
+                        else:
+                            col_name = cname_struct
 
                 col_id_list.append(col_id)
                 column_names.append(col_name)
 
         return col_id_list, column_names
 
-    def convert_dbf(self, diameter):
+    def convert_dbf(self, diameter, dbf_path, lang):
+
+        self.lng = lang
+
+        self.load_dbf(dbf_path=dbf_path)
 
         if diameter < 100:
             diameter = diameter * 25.4
@@ -216,8 +236,8 @@ class df_DBF:
         self.df_dbf['#DEPTH_MM'] = pd.to_numeric(self.df_dbf['#DEPTH_MM'], errors='coerce')
 
         # расчет остаточной толщины стенки
-        self.df_dbf['#REMAIN_WT'] = self.df_dbf.loc[self.df_dbf['#DEPTH_MM'] != '', '#WT'] - self.df_dbf.loc[
-            self.df_dbf['#DEPTH_MM'] != '', '#DEPTH_MM']
+        # self.df_dbf['#REMAIN_WT'] = self.df_dbf.loc[self.df_dbf['#DEPTH_MM'] != '', '#WT'] - self.df_dbf.loc[
+        #     self.df_dbf['#DEPTH_MM'] != '', '#DEPTH_MM']
 
         # конвертирование Номера особенности в числа
         self.df_dbf['#FEA_NUM'] = self.df_dbf['#FEA_NUM'].fillna(-1111111).astype(int)
@@ -276,7 +296,7 @@ class df_DBF:
                 lambda row: dimm(length=row['#LENGTH'], width=row['#WIDTH'], wt=row['#WT'],
                                  return_format=self.lng), axis=1)
         except Exception as ex:
-            print('## ERROR: no ML for Dimm:', ex)
+            print('# Info: no ML in DB detected')
 
         self.df_dbf = self.df_dbf.replace({'nan': '', 'NaN': '', float('NaN'): '', -1111111: ''})
 
@@ -334,8 +354,17 @@ def to_csv_custom_header(df, csv_path, column_names, csv_encoding):
     df.to_csv(csv_path, header=False, index=False, encoding=csv_encoding, mode="a")
 
 
-# возращаем список который входит в Exist
 def cross_columns_list(list_exist, list_target):
+    """
+    Возращаем список который входит в Exist
+    cross_columns = cross_columns_list(total_columns, exp_format)
+
+    list_exist - столбцы в наличии
+    list_target - желаемый список столбцов
+
+    cross_columns - только те из list_target что имеются в exist
+    """
+
     cross_columns = []
     for val in list_target:
         for val2 in list_exist:
@@ -416,11 +445,11 @@ if __name__ == '__main__':
     exp = df_dbf.convert_dbf(diameter=diam)
 
     # возвращаем столбец что нашли и их перевод для Кастом
-    custom_columns, custom_columns_names = df_dbf.parse_columns(columns_list=custom_columns, lang=lang)
+    custom_columns, custom_columns_names = df_dbf.parse_columns(columns_list=custom_columns)
 
     # Thailand
     # exp_format1 = ['#FEA_NUM', '#DIST_START', '#JN', '#US', '#JL', '#FEATURE', '#FEATURE_TYPE', '#DIMM', '#ORIENT_HOUR',
-    #               '#WT', '#LENGTH', '#WIDTH', '#DEPTH_PRC', '#DEPTH_MM', '#REMAIN_WT', '#LOC', '#ERF', '#PSAFE',
+    #               '#WT', '#LENGTH', '#WIDTH', '#DEPTH_PRC', '#DEPTH_MM', '#RWT', '#LOC', '#ERF', '#PSAFE',
     #               '#CLUSTER', '#DESCR', '#LAT', '#LONG', '#ALT']
 
     # , '#FEA_CODE_REPLACE','#HAR_CODE1_REPLACE', '#HAR_CODE2_REPLACE', '#DBF_DESCR', '#REMARKS'
@@ -437,7 +466,7 @@ if __name__ == '__main__':
     # возвращаем пересечение от шаблона к имеющимся
     cross_columns = cross_columns_list(total_columns, exp_format)
     # возвращаем столбец что нашли и их перевод для Дэфолтного
-    cross_columns_return, column_names_cross = df_dbf.parse_columns(columns_list=cross_columns, lang=lang)
+    cross_columns_return, column_names_cross = df_dbf.parse_columns(columns_list=cross_columns)
 
     # добавляем ДОК столбцы в кастом столбцы
     custom_columns.append('#DOC')

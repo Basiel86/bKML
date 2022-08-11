@@ -11,7 +11,7 @@ ml_range_colors = {'0-10': [99, 190, 123],
                    '50-60': [254, 203, 126],
                    '60-70': [252, 170, 120],
                    '70-80': [250, 138, 114],
-                   '80-900': [248, 105, 107],
+                   '80-90': [248, 105, 107],
                    '90-100': [248, 105, 107]}
 
 meter_lang = {'RU': 'м., ',
@@ -323,8 +323,8 @@ class bKML:
 
     def dbf_to_kml(self):
 
-        dbf_conf_init = DF_DBF.df_DBF(DBF_path=self.dbf_path, lang=self.lang)
-        df_DBF_raw = dbf_conf_init.convert_dbf(diameter=self.diameter)
+        dbf_conf_init = DF_DBF.df_DBF()
+        df_DBF_raw = dbf_conf_init.convert_dbf(diameter=self.diameter, dbf_path=self.dbf_path, lang=self.lang)
         meter = meter_lang[self.lang]
 
         weld_list = dbf_conf_init.get_welds_list()

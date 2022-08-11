@@ -5,8 +5,10 @@ import json
 stat_file_name = 'columns_counts.json'
 
 
-# открываем или создаем новый файл количества столбцов
 def load_columns_stat_dict():
+
+    # открываем или создаем новый файл количества столбцов
+
     if os.path.exists(stat_file_name):
         try:
             columns_counts_dict = json.load(open(stat_file_name))
@@ -25,8 +27,11 @@ def export_dict_to_json(columns_counts_dict):
         file.write(json.dumps(columns_counts_dict, indent=3))  # use `json.loads` to do the reverse
 
 
-# функция подсчета повторяющихся элементов в списке
 def columns_count_val_sort(columns_list):
+
+    # функция подсчета повторяющихся элементов в списке
+    # возвращаем сортированный список всех используемых ранее столбцов
+
     # загружаем или открываем файл
     columns_counts_dict = load_columns_stat_dict()
     # делаем датафрейм из списка
@@ -49,3 +54,5 @@ def columns_count_val_sort(columns_list):
 
     # экспортируем обратно в файл
     export_dict_to_json(columns_counts_dict=columns_counts_dict)
+
+
