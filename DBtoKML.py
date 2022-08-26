@@ -57,6 +57,7 @@ class bKML:
         self.is_others_folder_exists = False
         self.is_int_ml_folder_exists = False
         self.is_ext_ml_folder_exists = False
+        self.line_width = 3
 
         # self.ml_icon_path = self.kml.addfile(r'icons\ML.png')
 
@@ -192,7 +193,8 @@ class bKML:
                     max_depth = (i + 1) * 10
                     ml_range = str(min_depth) + "-" + str(max_depth)
 
-                    current_range_df = current_ml_type_df[current_ml_type_df['#DEPTH_PRC'].between(min_depth, max_depth, inclusive="left")]
+                    current_range_df = current_ml_type_df[
+                        current_ml_type_df['#DEPTH_PRC'].between(min_depth, max_depth, inclusive="left")]
 
                     if len(current_range_df) < max_group_count:
 
@@ -340,10 +342,11 @@ class bKML:
             line = tmp_lines_folder.newlinestring(name="line", description="line",
                                                   coords=feature_line, visibility=line_visibility)
             line.style.linestyle.color = simplekml.Color.rgb(217, 0, 0)
-            line.style.linestyle.width = 3  # 3 pixels
+            line.style.linestyle.width = self.line_width  # 3 pixels
 
-    def dbf_to_kml(self):
+    def dbf_to_kml(self, line_width):
 
+        self.line_width = line_width
         dbf_conf_init = DF_DBF.df_DBF()
         df_DBF_raw = dbf_conf_init.convert_dbf(diameter=self.diameter, dbf_path=self.dbf_path, lang=self.lang)
         meter = meter_lang[self.lang]
@@ -383,7 +386,8 @@ class bKML:
         anoms_list = anoms_df['#FEA_CODE_REPLACE'].value_counts(ascending=True)
         for current_anom_name, row in anoms_list.items():
             current_anom_df = df_DBF.loc[df_DBF['#FEA_CODE_REPLACE'] == current_anom_name]
-            anom_kml_data = current_anom_df[['ML_DESCR', '#LAT', '#LONG', '#DEPTH_PRC', '#DIST_START', '#LOC', '#CORR', '#RWT', '#ERF']]
+            anom_kml_data = current_anom_df[
+                ['ML_DESCR', '#LAT', '#LONG', '#DEPTH_PRC', '#DIST_START', '#LOC', '#CORR', '#RWT', '#ERF']]
             if current_anom_name in ['Потеря металла', 'Metal Loss', 'Pérdida de metal']:
                 self.kml_write_ml_subranges(kml_data=anom_kml_data, isvisible=[0, 0])
             else:
@@ -402,7 +406,7 @@ class bKML:
             current_anom_df = df_DBF.loc[df_DBF['#FEA_CODE_REPLACE'] == current_anom_name]
             construct_kml_data = current_anom_df[["OTH_DESCR", '#LAT', '#LONG']]
 
-            if current_anom_name in ['Задвижка', 'Valve']:
+            if current_anom_name in ['Задвижка (шток)', 'Valve']:
                 isvisible = [1, 0]
             else:
                 isvisible = [0, 0]
@@ -439,6 +443,7 @@ class bKML:
         if no_coord_records > 0:
             print("Записей без координат: ", no_coord_records)
         # print(f"KML создана по {len(df_DBF)} записям"'\n')
+
 
 def main():
     DEBUG = 1

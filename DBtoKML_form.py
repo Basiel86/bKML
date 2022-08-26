@@ -8,13 +8,10 @@ import parse_inch
 from parse_inch import parse_inch_prj
 import traceback
 
-
-
 EXP_DAY = '2022-10-01'
 
 lng_list = ["RU", "EN"]
 dbf_ext_list = ['dbf', 'DBF']
-
 
 # diam_list = inch_mm_df['Inch_name'].tolist()
 # mm_list = inch_mm_df['Inch'].tolist()
@@ -23,8 +20,10 @@ inch_names_list = parse_inch.get_inch_names_list()
 inch_list = parse_inch.get_inch_list()
 inch_dict = parse_inch.get_inch_dict()
 
+
 # diam_list = [4, 4.5, 5.563, 6.625, 8.625, 10.75, 12.75, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38,
 #              40, 42, 44, 46, 48, 52, 56]
+line_width = [1, 3, 5]
 
 
 def write_log(filepath=""):
@@ -53,6 +52,7 @@ def write_log(filepath=""):
 
 def DBFtoKML():
     dbf_path = str(path_textbox.get())
+    line_width = line_width_variable.get()
 
     lng = str(lng_list_variable.get())
 
@@ -62,7 +62,7 @@ def DBFtoKML():
     if dbf_path != "" and dbf_path[-3:] in dbf_ext_list:
 
         try:
-            DBtoKML.bKML(dbf_path=dbf_path, lang=lng, diameter=diameter).dbf_to_kml()
+            DBtoKML.bKML(dbf_path=dbf_path, lang=lng, diameter=diameter).dbf_to_kml(line_width=line_width)
             try:
                 write_log(filepath=dbf_path)
             except Exception as logex:
@@ -121,36 +121,42 @@ userForm.wm_iconbitmap(ico_abs_path)
 if exp_date_formatted >= now_date:
 
     userForm.title("DBF to KML")
-    userForm.geometry("600x70")
+    userForm.geometry("600x75")
 
     myLabel = Label(userForm, text="DBF файл")
-    myLabel.pack()
 
     path_variable = StringVar(userForm)
     path_textbox = Entry(userForm, width=98, textvariable=path_variable)
-    path_textbox.pack()
-
     myButon = Button(userForm, text="DBF to KML", command=DBFtoKML)
-    myButon.pack(side='left')
+    fileButon = Button(userForm, text="Open file", command=openfile)
 
     lng_list_variable = StringVar(userForm)
-    MFG_combobox = OptionMenu(userForm, lng_list_variable, *lng_list)
-    MFG_combobox.pack(side='right')
+    lng_combobox = OptionMenu(userForm, lng_list_variable, *lng_list)
     lng_list_variable.set(lng_list[0])
 
-    fileButon = Button(userForm, text="Open file", command=openfile)
-    fileButon.pack(side='right')
-    # fileButon.place(x=270, y=42)
-
-    blankLabel = Label(userForm, text="          ")
-    blankLabel.pack(side='left')
+    line_width_label = Label(userForm, text="Line Width")
+    line_width_variable = StringVar(userForm)
+    line_width_combobox = OptionMenu(userForm, line_width_variable, *line_width)
+    line_width_variable.set(3)
 
     inchLabel = Label(userForm, text="Diam")
-    inchLabel.pack(side='left')
-
     diam_list_variable = StringVar(userForm)
     diam_combobox = OptionMenu(userForm, diam_list_variable, *inch_names_list)
-    diam_combobox.pack(side='left')
+
+
+    myLabel.grid(row=0, column=0, columnspan=10)
+    path_textbox.grid(row=1, column=0, columnspan=10)
+
+    myButon.grid(row=2, column=0, sticky=W+E, padx=5, pady=5)
+
+    inchLabel.grid(row=2, column=2, sticky=E)
+    diam_combobox.grid(row=2, column=3, sticky=W)
+
+    line_width_label.grid(row=2, column=6, sticky=E)
+    line_width_combobox.grid(row=2, column=7, sticky=W)
+
+    fileButon.grid(row=2, column=8, sticky=E)
+    lng_combobox.grid(row=2, column=9)
 
     if arg != '':
         path_variable.set(arg)
@@ -184,6 +190,3 @@ else:
     userForm.mainloop()
 
 userForm.mainloop()
-
-
-
