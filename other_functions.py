@@ -1,5 +1,3 @@
-import pandas as pd
-
 def empty_if_nan(poss_nan):
     if str(poss_nan) == 'nan':
         return ''

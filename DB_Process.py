@@ -1,5 +1,4 @@
-import os
-
+from tkinter import *
 import parse_inch
 from DF_DBF import *
 from tkinter import filedialog as fd
@@ -12,14 +11,14 @@ from parse_inch import parse_inch_prj
 import traceback
 from columnsCaountValSort import columns_count_val_sort, load_columns_stat_dict
 
-from Export_columns import exp_format
+from parse_templates import *
 
 
 class DB_FORM:
 
     def __init__(self):
 
-        self.EXP_DAY = '2022-08-20'
+        self.EXP_DAY = '2022-09-03'
 
         self.lang_list = ["RU", "EN"]
         self.dbf_ext_list = ['dbf', 'DBF']
@@ -35,6 +34,7 @@ class DB_FORM:
         self.inch_names_list = parse_inch.get_inch_names_list()
         self.inch_list = parse_inch.get_inch_list()
         self.inch_dict = parse_inch.get_inch_dict()
+        self.templates_list = get_templates_list()
         # self.diam_list = [4, 4.5, 5.563, 6.625, 8.625, 10.75, 12.75, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38,
         #                   40, 42, 44, 46, 48, 52, 56]
 
@@ -80,6 +80,22 @@ class DB_FORM:
         self.diam_list_variable = StringVar(self.db_process_form)
         self.diam_combobox = OptionMenu(self.db_process_form, self.diam_list_variable, *self.inch_names_list)
 
+        self.templates_variable = StringVar(self.db_process_form)
+        self.templates_combobox = OptionMenu(self.db_process_form, self.templates_variable, *self.templates_list)
+        self.templates_combobox.configure(width=16)
+        self.templates_variable.set('Default')
+
+        self.template_name_label = Label(self.db_process_form, text="New Template Name")
+        self.template_list_label = Label(self.db_process_form, text="Templates List")
+        self.template_name_variable = StringVar(self.db_process_form)
+        self.template_name_textbox = Entry(self.db_process_form, width=22, textvariable=self.template_name_variable)
+
+        self.save_template_button = Button(self.db_process_form, text="Save template", command=self.save_template)
+        self.rewrite_template_button = Button(self.db_process_form, text="Rewrite template",
+                                              command=self.rewrite_template)
+        self.load_template_button = Button(self.db_process_form, text="Load template", command=self.load_template)
+        self.delete_template_button = Button(self.db_process_form, text="Delete template", command=self.delete_template)
+
         # высота в строках
         self.stat_tree = CheckboxTreeview(self.db_process_form, show='tree', column="c1", height=20)
         self.stat_tree.column("# 1", anchor='center', stretch='NO', width=60)
@@ -120,7 +136,8 @@ class DB_FORM:
         # читаем аргументы на входе
         arg = ''
         for arg in sys.argv[1:]:
-            print('Drag&Drop file: ', arg)
+            if os.path.exists(arg):
+                print('Drag&Drop file: ', arg)
 
         exp_date_formatted = datetime.strptime(self.EXP_DAY, "%Y-%m-%d").date()
         now_date = date.today()
@@ -137,7 +154,7 @@ class DB_FORM:
             self.db_process_form.maxsize(1700, 1000)
 
             self.lang_combobox.place(x=10, y=22)
-            self.diam_label.place(x=150, y=4)
+            self.diam_label.place(x=100, y=4)
             self.diam_combobox.place(x=70, y=22)
             self.path_label.place(x=320, y=33)
             self.path_textbox.place(x=150, y=57)
@@ -165,6 +182,16 @@ class DB_FORM:
 
             self.clear_process_list_button.place(x=1130, y=10)
             self.filter_total_columns_textbox.place(x=1320, y=10)
+
+            self.template_name_label.place(x=10, y=190)
+            self.template_name_textbox.place(x=10, y=210)
+            self.template_list_label.place(x=30, y=230)
+            self.templates_combobox.place(x=10, y=250)
+
+            self.save_template_button.place(x=160, y=210)
+            self.rewrite_template_button.place(x=250, y=210)
+            self.delete_template_button.place(x=355, y=210)
+            self.load_template_button.place(x=160, y=252)
 
             # self.db_columns_listbox.insert(1, "Data Structure")
             # self.db_columns_listbox.insert(2, "Algorithm")
@@ -202,7 +229,7 @@ class DB_FORM:
 
             self.lang_list_variable.set(self.lang_list[0])
 
-            if arg != '':
+            if arg != '' and os.path.exists(arg):
                 # пишем аргумент в строку пути
                 self.path_variable.set(arg)
                 # парсим инч
@@ -239,6 +266,46 @@ class DB_FORM:
             self.db_process_form.mainloop()
 
         self.db_process_form.mainloop()
+
+    def save_template(self):
+        template_name = self.template_name_variable.get()
+        columns_list = self.process_columns_df['COL_NAME'].tolist()
+
+        if len(columns_list) != 0 and len(template_name) != 0:
+            save_template(template_name=template_name, columns_list=columns_list)
+            self.template_name_textbox.delete(0, "end")
+            print('### Info: Шаблон сохранен')
+        else:
+            print("### Error: Список столбцов пуст или Имя шаблона пустое...")
+        self.update_option_menu()
+
+    def delete_template(self):
+        template_name = self.templates_variable.get()
+        delete_template(template_name)
+        self.update_option_menu()
+        self.templates_variable.set('Default')
+
+    def rewrite_template(self):
+        template_name = self.templates_variable.get()
+        columns_list = self.process_columns_df['COL_NAME'].tolist()
+
+        if len(columns_list) != 0:
+            rewrite_template(template_name=template_name, columns_list=columns_list)
+            print('### Info: Шаблон обновлен')
+        else:
+            print("### Error: Список столбцов пуст")
+        self.update_option_menu()
+
+    def update_option_menu(self):
+        """
+        Рефреш Компобокса
+        """
+        self.templates_list = get_templates_list()
+        templates_combobox = self.templates_combobox["menu"]
+        templates_combobox.delete(0, "end")
+        for string in self.templates_list:
+            templates_combobox.add_command(label=string,
+                                           command=lambda value=string: self.templates_variable.set(value))
 
     def custom_listbox_processed_add(self, event):
 
@@ -303,8 +370,8 @@ class DB_FORM:
                     self.db_columns_listbox.insert(END, item)
                     filter_index_list.append(total_columns_index_list[i])
 
-            self.total_columns_df = self.total_columns_filter_backup_df[self.total_columns_filter_backup_df.index.isin(filter_index_list)]
-
+            self.total_columns_df = self.total_columns_filter_backup_df[
+                self.total_columns_filter_backup_df.index.isin(filter_index_list)]
 
     def custom_listbox_processed_delete(self, even):
         if self.custom_listbox_processed.curselection() != ():
@@ -373,6 +440,52 @@ class DB_FORM:
 
         for i in total_columns_exist_sorted_names:
             self.db_columns_listbox.insert('end', i)
+
+    def load_template(self):
+
+        self.update_option_menu()
+
+        template_name = self.templates_variable.get()
+        template_columns_json = read_template(template_name=template_name)
+
+        try:
+            total_columns_index = self.db_df.columns.values.tolist()
+
+            template_columns_index, template_columns_names = self.df_dbf_class.parse_columns(
+                columns_list=template_columns_json)
+
+            template_columns = cross_columns_list(total_columns_index, template_columns_index)
+
+            # чистим и заполняем DF кастомного числа столбцов
+            self.process_columns_df = self.process_columns_df.iloc[0:0]
+
+            # если кастом не пустой то грузим его
+            if len(template_columns) > 1:
+                columns_raw = template_columns_json
+                columns_names = template_columns_names
+
+                for i in range(len(template_columns)):
+                    self.process_columns_df = self.process_columns_df.append(
+                        {'COL_INDEX': template_columns_index[i], 'COL_NAME': template_columns_names[i]},
+                        ignore_index=True)
+
+                self.custom_listbox_raw.delete(0, 'end')
+                self.custom_listbox_processed.delete(0, 'end')
+
+                for i in columns_raw:
+                    self.custom_listbox_raw.insert('end', i)
+
+                list_num = 0
+                for i in columns_names:
+                    self.custom_listbox_processed.insert('end', i)
+                    # красим красным если нашли #BLANK
+                    self.custom_listbox_processed.itemconfig("end", bg="#ff7373" if i == '#BLANK' else "white")
+                    if len(template_columns) > 2 and i == '#BLANK':
+                        self.custom_listbox_raw.itemconfig(list_num, bg="#ff7373" if i == '#BLANK' else "white")
+                    list_num += 1
+
+        except TypeError and AttributeError:
+            print('# ERROR: DB not Loaded!')
 
     def process_custom_columns(self):
 
@@ -491,9 +604,31 @@ class DB_FORM:
             try:
                 self.db_df = self.df_dbf_class.convert_dbf(diameter=diameter, dbf_path=db_path, lang=self.lng)
 
-                # получаем список Фич
-                stat_df = self.db_df['#FEATURE'].value_counts(dropna=False, normalize=False)
-                color_df = self.df_dbf_class.get_color_type_df(lng=self.lng)
+                # --------------------------------
+                # получаем статистику по фичам
+                stat_ser = self.db_df['#FEATURE'].value_counts(dropna=False, normalize=False)
+                # серия с цветами
+                color_ser = self.df_dbf_class.get_color_type_df(lng=self.lng)
+                # конвертим статистику в ДФ
+                stat_df = stat_ser.to_frame()
+                # столбец с числами переименовываем в index_stat
+                stat_df = stat_df.rename(columns={'#FEATURE': "index_count"})
+                # переносим индексы в столбец (index)
+                stat_df = stat_df.reset_index()
+                # создаем столбец с Тэгами
+                stat_df['tag'] = ''
+
+                # бежим по статистике и записываем тэги
+                for i, row in stat_df.iterrows():
+                    cur_value = stat_df.loc[i]['index']
+                    for j, row in color_ser.iterrows():
+                        if cur_value == color_ser.loc[j][1]:
+                            stat_df.at[i, 'tag'] = color_ser.loc[j][0]
+
+                # сортируем по Тэгам потом по Количество
+                stat_df.sort_values(['tag', 'index_count'], ascending=[True, False], inplace=True)
+
+                # --------------------------------
 
                 self.stat_tree.delete(*self.stat_tree.get_children())
 
@@ -510,10 +645,12 @@ class DB_FORM:
                 # self.stat_tree.bind("<<TreeviewSelect>>", treeview)
 
                 # бежим по списку и записываем
-                for index, value in stat_df.items():
-                    current_tag = self.get_fea_color_type(fea_name=index, color_df=color_df, lng=self.lng)
+                for i, row in stat_df.iterrows():
+                    feature = stat_df.loc[i]['index']
+                    feature_count = stat_df.loc[i]['index_count']
+                    feature_tag = stat_df.loc[i]['tag']
+                    self.stat_tree.insert('', 'end', text=feature, values=feature_count, tags=(feature_tag,))
 
-                    self.stat_tree.insert('', 'end', text=index, values=value, tags=(current_tag,))
                 # если количество больше 20 - расширяем список до количества
                 if len(stat_df) > 20:
                     self.stat_tree.config(height=len(stat_df))
@@ -660,4 +797,18 @@ class DB_FORM:
 
 
 if __name__ == "__main__":
-    DB_FORM()
+
+    arg = ''
+
+    if len(sys.argv[1:]) == 2:
+        run_atr = sys.argv[1:][0]
+        path = sys.argv[1:][1]
+
+        if run_atr == "-D":
+            export_default(dbf_path=path)
+            input("~~~ Done~~~")
+        else:
+            input("### Error: Wrong Attribute")
+
+    else:
+        DB_FORM()

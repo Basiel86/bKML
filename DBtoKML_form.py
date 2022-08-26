@@ -10,7 +10,7 @@ import traceback
 
 
 
-EXP_DAY = '2022-08-20'
+EXP_DAY = '2022-10-01'
 
 lng_list = ["RU", "EN"]
 dbf_ext_list = ['dbf', 'DBF']
@@ -99,6 +99,11 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
+def on_closing():
+    userForm.destroy()
+    sys.exit()
+
+
 userForm = Tk()
 
 # читаем аргументы на входе
@@ -124,7 +129,6 @@ if exp_date_formatted >= now_date:
     path_variable = StringVar(userForm)
     path_textbox = Entry(userForm, width=98, textvariable=path_variable)
     path_textbox.pack()
-
 
     myButon = Button(userForm, text="DBF to KML", command=DBFtoKML)
     myButon.pack(side='left')
@@ -163,13 +167,6 @@ if exp_date_formatted >= now_date:
     else:
         diam_list_variable.set(inch_names_list[6])
 
-
-
-    def on_closing():
-        userForm.destroy()
-        sys.exit()
-
-
     userForm.protocol("WM_DELETE_WINDOW", on_closing)
     userForm.mainloop()
 
@@ -183,18 +180,10 @@ else:
     exp_label2 = Label(master=userForm, text="Please update", fg='red', font=15)
     exp_label2.pack()
 
-
-    def on_closing():
-        userForm.destroy()
-        sys.exit()
-
-
     userForm.protocol("WM_DELETE_WINDOW", on_closing)
     userForm.mainloop()
 
 userForm.mainloop()
 
 
-def on_closing():
-    userForm.destroy()
-    sys.exit()
+

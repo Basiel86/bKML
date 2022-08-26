@@ -1,15 +1,14 @@
-from tkinter import *
 import os.path
 import pandas as pd
 import numpy as np
 import sys
 from simpledbf import Dbf5
-from parse_inch import parse_inch_prj
 from parse_inch import parse_inch_path
 from dimm import dimm
 import errno
 from other_functions import dbf_feature_type_combine
 from other_functions import dbf_description_combine
+from parse_templates import read_template
 
 # столбцы для дэфолтного экспорта
 from Export_columns import exp_format
@@ -50,7 +49,7 @@ def remote_or_local(remote_path, local_path):
         return remote_path
     else:
         print(f"# Info: {filename} file info: Local")
-        return local_path
+        return resource_path(local_path)
 
 
 class df_DBF:
@@ -335,6 +334,68 @@ class df_DBF:
                 self.df_dbf.loc[i]['#FEATURE_TYPE'] = ID_ROW.loc[1]['TYPE_RU']
 
 
+def export_default(dbf_path):
+    lang = "RU"
+    path = dbf_path
+
+    print(f'### Fast Export path: {dbf_path}')
+
+    diam = parse_inch_path(path)
+
+    # если не нашли - просим ввести дюймаж
+    if diam is None:
+        # просим ввести дюймаж
+        diam = input('Enter Diameter (Inch/mm)?: ')
+        # если что-то ввели то поверяем на дюйм/мм и домножаем
+        if diam != '':
+            diam = float(diam)
+            if diam > 100:
+                diam = diam / 25.4
+        # если ввели пустоту
+        else:
+            # ищем дюймаж в пути файла
+            diam = parse_inch_path(path)
+            # если и в пути нет, то пишем дефолтный
+            if diam is None:
+                print("# Default diameter = 8.625 inch")
+                diam = 8.625
+
+    df_dbf = df_DBF()
+    exp = df_dbf.convert_dbf(dbf_path=path, lang=lang, diameter=diam)
+
+    total_columns = exp.columns.values.tolist()
+
+    default_columns_list = read_template("Default")
+
+    template_columns_index, template_columns_names = df_dbf.parse_columns(
+        columns_list=default_columns_list)
+
+    # возвращаем пересечение от шаблона к имеющимся
+    cross_columns = cross_columns_list(total_columns, template_columns_index)
+    # возвращаем столбец что нашли и их перевод для Дэфолтного
+    cross_columns_return, column_names_cross = df_dbf.parse_columns(columns_list=cross_columns)
+
+    exp1 = exp[cross_columns]
+    column_names = column_names_cross
+
+    absbath = os.path.dirname(path)
+    basename = os.path.basename(path)
+    exportpath = os.path.join(absbath, basename)
+    exportpath_csv = f'{exportpath[:-4]}.csv'
+    csv_encoding = "cp1251"
+
+    try:
+        to_csv_custom_header(df=exp1, csv_path=exportpath_csv, column_names=column_names, csv_encoding=csv_encoding)
+
+    except Exception as PermissionError:
+        print(f"'{basename[:-4]}.csv' is opened, saved as '{basename[:-4]}_1.csv'")
+        exportpath = os.path.join(absbath, basename)
+        exportpath_csv = f'{exportpath[:-4]}_1.csv'
+        to_csv_custom_header(df=exp1, csv_path=exportpath_csv, column_names=column_names, csv_encoding=csv_encoding)
+
+    input("~~~ Done~~~")
+
+
 # сохраняем в csv c custom столбцами
 def to_csv_custom_header(df, csv_path, column_names, csv_encoding):
     print(f'# Custom headers info: Total columns: {len(column_names)}')
@@ -377,7 +438,6 @@ if __name__ == '__main__':
 
     DEBUG = 0
 
-    # дэфолтные
     diam = None
     lang = "RU"
     custom_columns = []
@@ -386,133 +446,16 @@ if __name__ == '__main__':
         path = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\Test\3nocm.DBF"
     else:
         arg = ''
-        for arg in sys.argv[1:]:
-            print(arg)
 
         if arg != '':
             path = arg
         else:
             path = input("DBF path: ")
 
-            custom_columns = input("Enter columns: ")
-            custom_columns = custom_columns.split('\t')
-
-            print(f'# ARG columns info: Columns received: {len(custom_columns)}')
-            print(f'# ARG columns info: Columns list: {custom_columns}')
-
-            # print(custom_columns)
-
         if path[-3:] != 'DBF' and path[-3:] != 'dbf':
             input("##ERROR: not DBF link")
         else:
-            # проверяем на наличие дюйма по проекту
-            diam = parse_inch_prj(path)
-            # если не нашли то ищем на всякий в проекте в папке выше (если под папка рабочих)
-            if diam is None:
-                diam = parse_inch_prj(os.path.dirname(path))
-
-            # если не нашли - просим ввести дюймаж
-            if diam is None:
-                # просим ввести дюймаж
-                diam = input('Enter Diameter (Inch/mm)?: ')
-                # если что-то ввели то поверяем на дюйм/мм и домножаем
-                if diam != '':
-                    diam = float(diam)
-                    if diam > 100:
-                        diam = diam / 25.4
-                # если ввели пустоту
-                else:
-                    # ищем дюймаж в пути файла
-                    diam = parse_inch_path(path)
-                    # если и в пути нет, то пишем дефолтный
-                    if diam is None:
-                        print("# Default diameter = 8.625 inch")
-                        diam = 8.625
-
-            if arg == '':
-                lang = input("'1/2' for EN/SP?: ")
-            else:
-                lang = "EN"
-
-            if lang == '1':
-                lang = "EN"
-            elif lang == '2':
-                lang = "SP"
-            else:
-                lang = "RU"
-
-    df_dbf = df_DBF(DBF_path=path, lang=lang)
-    exp = df_dbf.convert_dbf(diameter=diam)
-
-    # возвращаем столбец что нашли и их перевод для Кастом
-    custom_columns, custom_columns_names = df_dbf.parse_columns(columns_list=custom_columns)
-
-    # Thailand
-    # exp_format1 = ['#FEA_NUM', '#DIST_START', '#JN', '#US', '#JL', '#FEATURE', '#FEATURE_TYPE', '#DIMM', '#ORIENT_HOUR',
-    #               '#WT', '#LENGTH', '#WIDTH', '#DEPTH_PRC', '#DEPTH_MM', '#RWT', '#LOC', '#ERF', '#PSAFE',
-    #               '#CLUSTER', '#DESCR', '#LAT', '#LONG', '#ALT']
-
-    # , '#FEA_CODE_REPLACE','#HAR_CODE1_REPLACE', '#HAR_CODE2_REPLACE', '#DBF_DESCR', '#REMARKS'
-
-    # exp_format2 = ['#JN', '#FEA_NUM', '#DIST_START', '#JL', '#US', '#DOC', '#FEA_CODE_REPLACE', '#HAR_CODE1_REPLACE',
-    #               '#HAR_CODE2_REPLACE', '#FEATURE_TYPE', '#DBF_DESCR', "#DESCR", '#CORR', '#ERF', '#CLUSTER',
-    #               '#PSAFE', '#WT', '#DEPTH_MM', '#DEPTH_PRC', '#AMPL', '#DEPTH_PREV',
-    #               '#LENGTH', '#WIDTH', '#ORIENT_DEG', '#LOC', '#DIMM', '#LAT', '#LONG', '#ALT']
-
-    # orenburg
-
-    total_columns = exp.columns.values.tolist()
-
-    # возвращаем пересечение от шаблона к имеющимся
-    cross_columns = cross_columns_list(total_columns, exp_format)
-    # возвращаем столбец что нашли и их перевод для Дэфолтного
-    cross_columns_return, column_names_cross = df_dbf.parse_columns(columns_list=cross_columns)
-
-    # добавляем ДОК столбцы в кастом столбцы
-    custom_columns.append('#DOC')
-    custom_columns_names.append('#DOC')
-
-    # если есть кастом, то экспортим его, в противном случае - шаблон
-    if len(custom_columns) > 1:
-        exp1 = exp[custom_columns]
-        column_names = custom_columns_names
-    else:
-        exp1 = exp[cross_columns]
-        column_names = column_names_cross
-
-    # with open(file_path, 'w') as f:
-    #    f.write('Custom String\n')
-
-    # df.to_csv(file_path, header=False, mode="a")
-    # print (cross_columns)
-
-    absbath = os.path.dirname(path)
-    basename = os.path.basename(path)
-    exportpath = os.path.join(absbath, basename)
-    exportpath_csv = f'{exportpath[:-4]}.csv'
-    exportpath_xlsx = f'{exportpath[:-4]}.xlsx'
-
-    if lang == "RU":
-        csv_encoding = "cp1251"
-    else:
-        csv_encoding = "utf-8"
-    try:
-        to_csv_custom_header(df=exp1, csv_path=exportpath_csv, column_names=column_names, csv_encoding=csv_encoding)
-        # exp1.to_csv(exportpath_csv, encoding=csv_encoding, index=False)
-        # xw.Book(exportpath_csv)
-        # xw.view(exportpath_csv, table=False)
-        if lang == "SP":
-            exp1.to_excel(exportpath_xlsx, encoding=csv_encoding, index=False)
-
-    except Exception as PermissionError:
-        print(f"'{basename[:-4]}.csv' is opened, saved as '{basename[:-4]}_1.csv'")
-        exportpath = os.path.join(absbath, basename)
-        exportpath_csv = f'{exportpath[:-4]}_1.csv'
-        exportpath_xlsx = f'{exportpath[:-4]}_1.xlsx'
-        to_csv_custom_header(df=exp1, csv_path=exportpath_csv, column_names=column_names, csv_encoding=csv_encoding)
-        # exp1.to_csv(exportpath_csv, encoding=csv_encoding, index=False)
-        if lang == "SP":
-            exp1.to_excel(exportpath_xlsx, encoding=csv_encoding, index=False)
+            export_default(path)
 
     if DEBUG != 1:
         input("~~~ Done~~~")

@@ -116,7 +116,7 @@ class bKML:
         # self.kml.save(f"{kml_name}.kml")
         self.kml.savekmz(f"{kml_name}.kmz")
 
-    def kml_write_anomaly(self, feature_name, kml_data, isvisible=None):
+    def kml_write_anomaly(self, feature_name, kml_data, isvisible=None, add_points_folder=False):
 
         self.kml_make_anomalies_folder()
 
@@ -130,7 +130,10 @@ class bKML:
         pname, lname = get_pname_lname(self.lang)
 
         tmp_folder = self.kml_anomalies_folder.newdocument(name=feature_name)
-        tmp_points_folder = tmp_folder.newfolder(name=pname)
+        if add_points_folder is True:
+            tmp_points_folder = tmp_folder.newfolder(name=pname)
+        else:
+            tmp_points_folder = tmp_folder
         # tmp_lines_folder = tmp_folder.newfolder(name=lname)
 
         for elem_id in range(len(kml_data)):
@@ -146,7 +149,7 @@ class bKML:
         # line.style.linestyle.color = simplekml.Color.red  # Red
         # line.style.linestyle.width = 3  # 3 pixels
 
-    def kml_write_ml_subranges(self, kml_data, isvisible=None):
+    def kml_write_ml_subranges(self, kml_data, isvisible=None, add_points_folder=False):
 
         max_group_count = 5000
 
@@ -201,7 +204,12 @@ class bKML:
 
                         if len(current_range_df) > 0:
                             tmp_folder = tmp_current_type_ml_folder.newfolder(name=f'{i * 10}-{i * 10 + 10}%')
-                            tmp_points_folder = tmp_folder.newfolder(name=pname)
+
+                            if add_points_folder is True:
+                                tmp_points_folder = tmp_folder.newfolder(name=pname)
+                            else:
+                                tmp_points_folder = tmp_folder
+
                             for elem_id in range(len(current_range_df)):
                                 current_coord = [(current_range_df.iloc[elem_id, 2], current_range_df.iloc[elem_id, 1])]
                                 feature_line.append(
@@ -219,7 +227,7 @@ class bKML:
                                 # point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_square.png'
                                 point.style.labelstyle.scale = 0.9
 
-    def kml_write_construction(self, feature_name, kml_data, isvisible=None):
+    def kml_write_construction(self, feature_name, kml_data, isvisible=None, add_points_folder=False):
 
         self.kml_make_constructions_folder()
 
@@ -233,7 +241,12 @@ class bKML:
         pname, lname = get_pname_lname(self.lang)
 
         tmp_folder = self.kml_constructions_folder.newdocument(name=feature_name)
-        tmp_points_folder = tmp_folder.newfolder(name=pname)
+
+        if add_points_folder is True:
+            tmp_points_folder = tmp_folder.newfolder(name=pname)
+        else:
+            tmp_points_folder = tmp_folder
+
         # tmp_lines_folder = tmp_folder.newfolder(name=lname)
 
         for elem_id in range(len(kml_data)):
@@ -249,7 +262,7 @@ class bKML:
         # line.style.linestyle.color = simplekml.Color.red  # Red
         # line.style.linestyle.width = 3  # 3 pixels
 
-    def kml_write_others(self, feature_name, kml_data, isvisible=None):
+    def kml_write_others(self, feature_name, kml_data, isvisible=None, add_points_folder=False):
 
         self.kml_make_others_folder()
 
@@ -263,7 +276,11 @@ class bKML:
         pname, lname = get_pname_lname(self.lang)
 
         tmp_folder = self.kml_others_folder.newdocument(name=feature_name)
-        tmp_points_folder = tmp_folder.newfolder(name=pname)
+
+        if add_points_folder is True:
+            tmp_points_folder = tmp_folder.newfolder(name=pname)
+        else:
+            tmp_points_folder = tmp_folder
         # tmp_lines_folder = tmp_folder.newfolder(name=lname)
 
         for elem_id in range(len(kml_data)):
@@ -279,7 +296,7 @@ class bKML:
         # line.style.linestyle.color = simplekml.Color.red  # Red
         # line.style.linestyle.width = 3  # 3 pixels
 
-    def kml_write_top_lvl(self, feature_name, kml_data, isvisible=None):
+    def kml_write_top_lvl(self, feature_name, kml_data, isvisible=None, points_folder=False):
 
         if isvisible is None:
             isvisible = [1, 0]
@@ -299,7 +316,11 @@ class bKML:
 
         tmp_folder = self.kml.newdocument(name=feature_name)
         tmp_folder.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png'
-        tmp_points_folder = tmp_folder.newfolder(name=pname)
+
+        if points_folder is True:
+            tmp_points_folder = tmp_folder.newfolder(name=pname)
+        else:
+            tmp_points_folder = tmp_folder
         # tmp_lines_folder = tmp_folder.newfolder(name=lname)
 
         for elem_id in range(len(kml_data)):
@@ -396,11 +417,14 @@ class bKML:
             if current_anom_name in ['Шов', 'Weld']:
                 top_kml_data = current_anom_df[["WELD_DESCR", '#LAT', '#LONG']]
                 isvisible = [0, 1]
+                points_folder = True
             else:
                 top_kml_data = current_anom_df[["OTH_DESCR", '#LAT', '#LONG']]
                 isvisible = [1, 0]
+                points_folder = False
 
-            self.kml_write_top_lvl(feature_name=current_anom_name, kml_data=top_kml_data, isvisible=isvisible)
+            self.kml_write_top_lvl(feature_name=current_anom_name, kml_data=top_kml_data,
+                                   isvisible=isvisible, points_folder=points_folder)
 
         absbath = os.path.dirname(self.dbf_path)
         basename = os.path.basename(self.dbf_path)
@@ -415,7 +439,6 @@ class bKML:
         if no_coord_records > 0:
             print("Записей без координат: ", no_coord_records)
         # print(f"KML создана по {len(df_DBF)} записям"'\n')
-
 
 def main():
     DEBUG = 1
