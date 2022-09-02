@@ -29,3 +29,9 @@ exp_format = [
     '#FEA_NUM_PREV',
     '#VTD_NUM',
     '#YEARS']
+
+exp_format2 = [
+    '#FEA_NUM',
+    'HELLO',
+    '#JN',
+    'Дистанция, м']

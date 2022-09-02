@@ -1,5 +1,6 @@
 from tkinter import *
 import parse_inch
+import parse_templates
 from DF_DBF import *
 from tkinter import filedialog as fd
 from datetime import datetime, date
@@ -29,7 +30,8 @@ class DB_FORM:
                             "WELD": '#c0c0c0',
                             "MARKER": '#bada55',
                             "OTHER": '#f5f5f5',
-                            "REP": '#ff7373'}
+                            "REP": '#ff7373',
+                            "GPS_TMP": '#cd23d5'}
 
         self.inch_names_list = parse_inch.get_inch_names_list()
         self.inch_list = parse_inch.get_inch_list()
@@ -95,6 +97,8 @@ class DB_FORM:
                                               command=self.rewrite_template)
         self.load_template_button = Button(self.db_process_form, text="Load template", command=self.load_template)
         self.delete_template_button = Button(self.db_process_form, text="Delete template", command=self.delete_template)
+        self.open_templates_folder_button = Button(self.db_process_form, text="Open Templates Folder",
+                                                   command=parse_templates.open_templates_folder)
 
         # высота в строках
         self.stat_tree = CheckboxTreeview(self.db_process_form, show='tree', column="c1", height=20)
@@ -187,6 +191,7 @@ class DB_FORM:
             self.template_name_textbox.place(x=10, y=210)
             self.template_list_label.place(x=30, y=230)
             self.templates_combobox.place(x=10, y=250)
+            self.open_templates_folder_button.place(x=12, y=300)
 
             self.save_template_button.place(x=160, y=210)
             self.rewrite_template_button.place(x=250, y=210)
@@ -274,7 +279,6 @@ class DB_FORM:
         if len(columns_list) != 0 and len(template_name) != 0:
             save_template(template_name=template_name, columns_list=columns_list)
             self.template_name_textbox.delete(0, "end")
-            print('### Info: Шаблон сохранен')
         else:
             print("### Error: Список столбцов пуст или Имя шаблона пустое...")
         self.update_option_menu()
@@ -306,6 +310,7 @@ class DB_FORM:
         for string in self.templates_list:
             templates_combobox.add_command(label=string,
                                            command=lambda value=string: self.templates_variable.set(value))
+
 
     def custom_listbox_processed_add(self, event):
 
@@ -459,6 +464,13 @@ class DB_FORM:
             # чистим и заполняем DF кастомного числа столбцов
             self.process_columns_df = self.process_columns_df.iloc[0:0]
 
+            # проверяем есть ли шаблонные значения в Базе
+            for i in range(len(template_columns_index)):
+                if not template_columns_index[i] in template_columns:
+                    if template_columns_names[i] != "#BLANK":
+                        template_columns_index[i] = "#BLANK"
+                        template_columns_names[i] = "#NOT_IN_DB"
+
             # если кастом не пустой то грузим его
             if len(template_columns) > 1:
                 columns_raw = template_columns_json
@@ -479,9 +491,9 @@ class DB_FORM:
                 for i in columns_names:
                     self.custom_listbox_processed.insert('end', i)
                     # красим красным если нашли #BLANK
-                    self.custom_listbox_processed.itemconfig("end", bg="#ff7373" if i == '#BLANK' else "white")
+                    self.custom_listbox_processed.itemconfig("end", bg="#ff7373" if i == '#BLANK' or i == "#NOT_IN_DB" else "white")
                     if len(template_columns) > 2 and i == '#BLANK':
-                        self.custom_listbox_raw.itemconfig(list_num, bg="#ff7373" if i == '#BLANK' else "white")
+                        self.custom_listbox_raw.itemconfig(list_num, bg="#ff7373" if i == '#BLANK' or i == "#NOT_IN_DB" else "white")
                     list_num += 1
 
         except TypeError and AttributeError:
@@ -495,7 +507,8 @@ class DB_FORM:
         """
 
         try:
-            custom_columns = []
+            columns_raw = []
+            columns_names = []
             custom_columns_textbox = self.columns_variable.get()[:-1]
 
             total_columns_index = self.db_df.columns.values.tolist()
@@ -506,17 +519,18 @@ class DB_FORM:
                 custom_columns_index, custom_columns_names = self.df_dbf_class.parse_columns(
                     columns_list=custom_columns_names_raw)
                 custom_columns = cross_columns_list(total_columns_index, custom_columns_index)
+                # проверяем есть ли шаблонные значения в Базе
+                for i in range(len(custom_columns_index)):
+                    if not custom_columns_index[i] in custom_columns:
+                        if custom_columns_names[i] != "#BLANK":
+                            custom_columns_index[i] = "#BLANK"
+                            custom_columns_names[i] = "#NOT_IN_DB"
 
-            # возвращаем пересечение от шаблона к дэфолтному
-            cross_columns = cross_columns_list(total_columns_index, exp_format)
-            # возвращаем столбец что нашли и их перевод для Дэфолтного
-            cross_columns_index, cross_columns_names = self.df_dbf_class.parse_columns(columns_list=cross_columns)
+                # чистим и заполняем DF кастомного числа столбцов
+                self.process_columns_df = self.process_columns_df.iloc[0:0]
 
-            # чистим и заполняем DF кастомного числа столбцов
-            self.process_columns_df = self.process_columns_df.iloc[0:0]
+                # если кастом не пустой то грузим его
 
-            # если кастом не пустой то грузим его
-            if len(custom_columns) > 1:
                 columns_raw = custom_columns_names_raw
                 columns_names = custom_columns_names
 
@@ -524,28 +538,22 @@ class DB_FORM:
                     self.process_columns_df = self.process_columns_df.append(
                         {'COL_INDEX': custom_columns_index[i], 'COL_NAME': custom_columns_names[i]}, ignore_index=True)
 
-            # если кастом пустой - заполняем дэфолтный
+                self.custom_listbox_raw.delete(0, 'end')
+                self.custom_listbox_processed.delete(0, 'end')
+
+                for i in columns_raw:
+                    self.custom_listbox_raw.insert('end', i)
+
+                list_num = 0
+                for i in columns_names:
+                    self.custom_listbox_processed.insert('end', i)
+                    # красим красным если нашли #BLANK
+                    self.custom_listbox_processed.itemconfig("end", bg="#ff7373" if i == '#BLANK' or i == "#NOT_IN_DB" else "white")
+                    if len(custom_columns) > 2 and i == '#BLANK':
+                        self.custom_listbox_raw.itemconfig(list_num, bg="#ff7373" if i == '#BLANK' or i == "#NOT_IN_DB" else "white")
+                    list_num += 1
             else:
-                columns_raw = []
-                columns_names = cross_columns_names
-                for i in range(len(columns_names)):
-                    self.process_columns_df = self.process_columns_df.append(
-                        {'COL_INDEX': cross_columns_index[i], 'COL_NAME': cross_columns_names[i]}, ignore_index=True)
-
-            self.custom_listbox_raw.delete(0, 'end')
-            self.custom_listbox_processed.delete(0, 'end')
-
-            for i in columns_raw:
-                self.custom_listbox_raw.insert('end', i)
-
-            list_num = 0
-            for i in columns_names:
-                self.custom_listbox_processed.insert('end', i)
-                # красим красным если нашли #BLANK
-                self.custom_listbox_processed.itemconfig("end", bg="#ff7373" if i == '#BLANK' else "white")
-                if len(custom_columns) > 2 and i == '#BLANK':
-                    self.custom_listbox_raw.itemconfig(list_num, bg="#ff7373" if i == '#BLANK' else "white")
-                list_num += 1
+                print("### Info: Custom columns field is empty..")
         except TypeError and AttributeError:
             print('# ERROR: DB not Loaded!')
 
@@ -582,7 +590,7 @@ class DB_FORM:
                            f'{file_path}\n')
             log_file.close()
         except Exception as ex:
-            print("LOG Error: ", ex)
+            print("LOG Error")
 
     @staticmethod
     def get_fea_color_type(fea_name, color_df, lng):

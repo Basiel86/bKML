@@ -9,6 +9,7 @@ import errno
 from other_functions import dbf_feature_type_combine
 from other_functions import dbf_description_combine
 from parse_templates import read_template
+import traceback
 
 # столбцы для дэфолтного экспорта
 from Export_columns import exp_format
@@ -102,11 +103,6 @@ class df_DBF:
         self.welds_list = self.df_index_fea_code.loc[self.df_index_fea_code['KML_D_TYPE'] == 'WELD', 'ID']
         self.lam_list = self.df_index_fea_code.loc[self.df_index_fea_code['KML_D_TYPE'] == 'LAM', 'ID']
 
-        # FEA_RU
-        # TYPE_RU
-        # FEA_EN
-        # TYPE_EN
-
     def load_dbf(self, dbf_path):
 
         self.dbf_path = dbf_path
@@ -139,6 +135,9 @@ class df_DBF:
         if "#CORR" not in self.df_dbf.columns:
             self.df_dbf['#CORR'] = ''
 
+        if "#WT" not in self.df_dbf.columns:
+            self.df_dbf['#WT'] = ''
+
     def get_color_type_df(self, lng):
         return self.df_index_fea_code[['COLOR_TYPE', f'FEA_{lng}']]
 
@@ -150,6 +149,61 @@ class df_DBF:
 
     def get_welds_list(self):
         return self.welds_list
+
+    def parse_columns_df(self, columns_list: list, cross_list: list, ret_blank=True) -> pd.DataFrame:
+
+        """
+        Получаем лист названий столбцов и возвращем соотвтствие их ID к Описанию
+        ret_blank - если столбец не найден - возвращяем BLANK или оставляем искомое имя
+        cross_list - список столбцов для поиска пересечения
+        Возвращаем DF со столбцами [COL_VAR_NAME, COL_ID, COL_NAME]
+        """
+
+        # Конвертим лист в Датафрейм и добавляем нужные столбцы
+        columns_list_df = pd.DataFrame(columns_list, columns=["COL_VAR_NAME"])
+        columns_list_df['COL_ID'] = ''
+        columns_list_df['COL_NAME'] = ''
+
+        # Конвертим Cross лист в Датафрейм и добавляем нужные столбцы
+        cross_list_df = pd.DataFrame(cross_list, columns=["COL_ID"])
+        cross_list_df = cross_list_df.set_index('COL_ID')
+
+        # VAR структуру фильтруем по наличию в исходной
+        filtered_var_id = self.df_struct_col_var[
+            self.df_struct_col_var['COL_VAR_NAME'].isin(columns_list_df['COL_VAR_NAME'])]
+        # Индексируем по столбцу COL_VAR_NAME
+        filtered_var_id = filtered_var_id.set_index('COL_VAR_NAME')
+
+        # Индексируем ID/NAME список по COL_ID
+        col_id_name_df = self.df_struct_col_id_formats.set_index('COL_ID')
+
+        # Бежим по полученному списку
+        for i, row in columns_list_df.iterrows():
+            # текущее имя VAR
+            var_name = columns_list_df.loc[i]['COL_VAR_NAME']
+            if var_name in filtered_var_id.index:
+                # найденное ID по VAR
+                var_id = filtered_var_id.loc[var_name]['COL_ID']
+
+                # пишем ID и Name
+                columns_list_df.loc[i]['COL_ID'] = var_id
+                columns_list_df.loc[i]['COL_NAME'] = col_id_name_df.loc[var_id][f'COL_NAME_{self.lng}']
+            else:
+                columns_list_df.loc[i]['COL_ID'] = '#BLANK'
+                if ret_blank:
+                    col_name = '#BLANK'
+                else:
+                    col_name = var_name
+                columns_list_df.loc[i]['COL_NAME'] = col_name
+
+        # проверяем на наличие пересечения для получения #NOT_IN_DB
+        for i, row in columns_list_df.iterrows():
+            var_id = columns_list_df.loc[i]['COL_ID']
+            if var_id not in cross_list_df.index and ret_blank:
+                columns_list_df.loc[i][f'COL_ID'] = '#BLANK'
+                columns_list_df.loc[i][f'COL_NAME'] = '#NOT_IN_DB'
+
+        return columns_list_df
 
     def parse_columns(self, columns_list, ret_blank=True):
 
@@ -210,116 +264,129 @@ class df_DBF:
         # exportpath = r'd:\WORK\OrenburgNeft\NOA 8 inch DNS Olhovskaya to Terminal Service, 19.749 km\Reports\PR\Run3\DB_corr dist\123.csv'
         # self.df_dbf.to_csv(exportpath, encoding='cp1251', index=False)
 
-        self.df_dbf['#FEATURE_TYPE'] = self.df_dbf.apply(
-            lambda row: dbf_feature_type_combine(fea_code_replace_ft=row['#FEA_CODE_REPLACE_FT'],
-                                                 har_code1=row['#HAR_CODE1_REPLACE'],
-                                                 har_code2=row['#HAR_CODE2_REPLACE'], corr=row['#CORR'],
-                                                 description=row['#DBF_DESCR'], ft_list=self.har_code_ft_list,
-                                                 d_list=self.har_code_d_list), axis=1)
-
-        self.df_dbf['#DESCR'] = self.df_dbf.apply(
-            lambda row: dbf_description_combine(har_code1=row['#HAR_CODE1_REPLACE'],
-                                                har_code2=row['#HAR_CODE2_REPLACE'], corr=row['#CORR'],
-                                                description=row['#DBF_DESCR'], ft_list=self.har_code_ft_list,
-                                                d_list=self.har_code_d_list), axis=1)
-
-        # вычитаем и добавляем к дистации швов для корректной сортировки Аномалий и прочего на дистанции шва
-        self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list), '#DIST_START'] = \
-            self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list), '#DIST_START'] + 0.0001
-        # сортировка по дистации
-        self.df_dbf = self.df_dbf.sort_values('#DIST_START')
-        self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list), '#DIST_START'] = \
-            self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list), '#DIST_START'] - 0.0001
-
-        # конвертирование Глубины в числа
-        self.df_dbf['#DEPTH_MM'] = pd.to_numeric(self.df_dbf['#DEPTH_MM'], errors='coerce')
-
-        # расчет остаточной толщины стенки
-        # self.df_dbf['#REMAIN_WT'] = self.df_dbf.loc[self.df_dbf['#DEPTH_MM'] != '', '#WT'] - self.df_dbf.loc[
-        #     self.df_dbf['#DEPTH_MM'] != '', '#DEPTH_MM']
-
-        # конвертирование Номера особенности в числа
-        self.df_dbf['#FEA_NUM'] = self.df_dbf['#FEA_NUM'].fillna(-1111111).astype(int)
-
-        # https://stackoverflow.com/questions/25952790/convert-pandas-series-from-dtype-object-to-float-and-errors-to-nans
-
-        # конвертирование WT в число
-        self.df_dbf['#WT'] = pd.to_numeric(self.df_dbf['#WT'], errors='coerce')
-
-        # конвертируем давление в MPa
-        self.df_dbf['#PSAFE'] = self.df_dbf.loc[self.df_dbf['#PSAFE'] != '', '#PSAFE'] * 0.0980665
-
-        # создание углов в градусах
-        self.df_dbf['#ORIENT_HOUR'] = self.df_dbf.loc[self.df_dbf['#ORIENT_DEG'] != '', '#ORIENT_DEG'] / 720
-
-        # глубины вмятина в процентах
-        self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.geom_list), '#DEPTH_PRC'] = round(
-            self.df_dbf['#DEPTH_MM'] / diameter * 100, 1)
-        # глубины  процентах
-        self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.ml_list) | self.df_dbf['#FEA_CODE'].isin(
-            self.lam_list), '#DEPTH_PRC'] = round(self.df_dbf['#DEPTH_MM'] / self.df_dbf['#WT'] * 100, 1)
-        # глубина '1' если получилась отрицательной (для проверки)
-        self.df_dbf.loc[self.df_dbf['#DEPTH_PRC'] < 0, '#DEPTH_PRC'] = 1
-        # чистка длин у швов
-        self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list), '#LENGTH'] = ''
-
-        # нумеруем кастом JN
-        self.df_dbf['#JN_Custom'] = ''
-        for i, row in self.df_dbf.iterrows():
-            if int(self.df_dbf.loc[i]['#FEA_CODE']) in self.welds_list.values:
-                self.df_dbf.at[i, '#JN_Custom'] = (i + 1) * 10
-        # меняем пустые на NAN и заполнем их предыдущими значениями
-        self.df_dbf['#JN_Custom'] = self.df_dbf['#JN_Custom'].replace('', np.NAN)
-        self.df_dbf['#JN_Custom'] = self.df_dbf['#JN_Custom'].fillna(method='ffill')
-        # создаем фрэйм швов
-        welds_jn_dist_array = self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list)][
-            ['#JN_Custom', '#DIST_START', '#FEA_CODE']]
-        # считаем длину секций
-        welds_jn_dist_array['#JL'] = round(welds_jn_dist_array['#DIST_START'].diff(1), 3)
-        # двигаем длину секций на 1 вверх
-        welds_jn_dist_array['#JL'] = welds_jn_dist_array['#JL'].shift(-1)
-        # заполняем длину секций общей базы по созданному фрэйму швов
         try:
-            self.df_dbf['#JL'] = self.df_dbf['#JN_Custom'].map(welds_jn_dist_array.set_index('#JN_Custom')['#JL'])
+            self.df_dbf['#FEATURE_TYPE'] = self.df_dbf.apply(
+                lambda row: dbf_feature_type_combine(fea_code_replace_ft=row['#FEA_CODE_REPLACE_FT'],
+                                                     har_code1=row['#HAR_CODE1_REPLACE'],
+                                                     har_code2=row['#HAR_CODE2_REPLACE'], corr=row['#CORR'],
+                                                     description=row['#DBF_DESCR'], ft_list=self.har_code_ft_list,
+                                                     d_list=self.har_code_d_list), axis=1)
+
+            self.df_dbf['#DESCR'] = self.df_dbf.apply(
+                lambda row: dbf_description_combine(har_code1=row['#HAR_CODE1_REPLACE'],
+                                                    har_code2=row['#HAR_CODE2_REPLACE'], corr=row['#CORR'],
+                                                    description=row['#DBF_DESCR'], ft_list=self.har_code_ft_list,
+                                                    d_list=self.har_code_d_list), axis=1)
+
+            # вычитаем и добавляем к дистации швов для корректной сортировки Аномалий и прочего на дистанции шва
+            self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list), '#DIST_START'] = \
+                self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list), '#DIST_START'] - 0.0001
+            # сортировка по дистации
+            self.df_dbf = self.df_dbf.sort_values('#DIST_START')
+            self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list), '#DIST_START'] = \
+                self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list), '#DIST_START'] + 0.0001
+
+            # конвертирование Глубины в числа
+            self.df_dbf['#DEPTH_MM'] = pd.to_numeric(self.df_dbf['#DEPTH_MM'], errors='coerce')
+
+            # расчет остаточной толщины стенки
+            # self.df_dbf['#REMAIN_WT'] = self.df_dbf.loc[self.df_dbf['#DEPTH_MM'] != '', '#WT'] - self.df_dbf.loc[
+            #     self.df_dbf['#DEPTH_MM'] != '', '#DEPTH_MM']
+
+            # конвертирование Номера особенности в числа
+            self.df_dbf['#FEA_NUM'] = self.df_dbf['#FEA_NUM'].fillna(-1111111).astype(int)
+
+            # https://stackoverflow.com/questions/25952790/convert-pandas-series-from-dtype-object-to-float-and-errors-to-nans
+
+            # конвертируем давление в MPa
+            if '#PSAFE' in self.df_dbf.columns:
+                self.df_dbf['#PSAFE'] = self.df_dbf.loc[self.df_dbf['#PSAFE'] != '', '#PSAFE'] * 0.0980665
+
+            # создание углов в градусах
+            if '#ORIENT_HOUR' in self.df_dbf.columns:
+                self.df_dbf['#ORIENT_HOUR'] = self.df_dbf.loc[self.df_dbf['#ORIENT_DEG'] != '', '#ORIENT_DEG'] / 720
+
+            # глубины вмятина в процентах
+            self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.geom_list), '#DEPTH_PRC'] = round(
+                self.df_dbf['#DEPTH_MM'] / diameter * 100, 2)
+
+            # конвертирование WT в число
+            self.df_dbf['#WT'] = pd.to_numeric(self.df_dbf['#WT'], errors='coerce')
+
+            # глубины  процентах
+            self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.ml_list) | self.df_dbf['#FEA_CODE'].isin(
+                self.lam_list), '#DEPTH_PRC'] = round(self.df_dbf['#DEPTH_MM'] / self.df_dbf['#WT'] * 100, 2)
+            # глубина '1' если получилась отрицательной (для проверки)
+            self.df_dbf.loc[self.df_dbf['#DEPTH_PRC'] < 0, '#DEPTH_PRC'] = 1
+
+            # чистка длин у швов
+            self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list), '#LENGTH'] = ''
+
+            # нумеруем кастом JN
+            self.df_dbf['#JN_Custom'] = ''
+            for i, row in self.df_dbf.iterrows():
+                if int(self.df_dbf.loc[i]['#FEA_CODE']) in self.welds_list.values:
+                    self.df_dbf.at[i, '#JN_Custom'] = (i + 1) * 10
+            # меняем пустые на NAN и заполнем их предыдущими значениями
+            self.df_dbf['#JN_Custom'] = self.df_dbf['#JN_Custom'].replace('', np.NAN)
+            self.df_dbf['#JN_Custom'] = self.df_dbf['#JN_Custom'].fillna(method='ffill')
+            # создаем фрэйм швов
+            welds_jn_dist_array = self.df_dbf.loc[self.df_dbf['#FEA_CODE'].isin(self.welds_list)][
+                ['#JN_Custom', '#DIST_START', '#FEA_CODE']]
+            # считаем длину секций
+            welds_jn_dist_array['#JL'] = round(welds_jn_dist_array['#DIST_START'].diff(1), 3)
+            # двигаем длину секций на 1 вверх
+            welds_jn_dist_array['#JL'] = welds_jn_dist_array['#JL'].shift(-1)
+            # заполняем длину секций общей базы по созданному фрэйму швов
+            try:
+                self.df_dbf['#JL'] = self.df_dbf['#JN_Custom'].map(welds_jn_dist_array.set_index('#JN_Custom')['#JL'])
+            except Exception as ex:
+                print('## ERROR: no Welds, JL not calculated: ', ex)
+
+            # маска для потерей металла под расчет DIMM
+            mask = self.df_dbf['#FEA_CODE'].isin(self.ml_list) & \
+                   self.df_dbf["#LENGTH"].notnull() & \
+                   self.df_dbf["#WIDTH"].notnull() & \
+                   self.df_dbf["#WT"].notnull()
+
+            try:
+                self.df_dbf['#DIMM'] = self.df_dbf[mask].apply(
+                    lambda row: dimm(length=row['#LENGTH'], width=row['#WIDTH'], wt=row['#WT'],
+                                     return_format=self.lng), axis=1)
+            except Exception as ex:
+                print('# Info: no ML in DB detected')
+
+            self.df_dbf = self.df_dbf.replace({'nan': '', 'NaN': '', float('NaN'): '', -1111111: ''})
+
+            print("# DB load status: Loaded successfully!\n")
+
+            return self.df_dbf
+
+        except ValueError:
+            input("\n### Error: DB Error, try process it by DBFnewColumns and repeat, if So, call Developer!")
         except Exception as ex:
-            print('## ERROR: no Welds, JL not calculated: ', ex)
+            print(ex)
+            input(traceback.format_exc())
 
-        # маска для потерей металла под расчет DIMM
-        mask = self.df_dbf['#FEA_CODE'].isin(self.ml_list) & \
-               self.df_dbf["#LENGTH"].notnull() & \
-               self.df_dbf["#WIDTH"].notnull() & \
-               self.df_dbf["#WT"].notnull()
-
-        try:
-            self.df_dbf['#DIMM'] = self.df_dbf[mask].apply(
-                lambda row: dimm(length=row['#LENGTH'], width=row['#WIDTH'], wt=row['#WT'],
-                                 return_format=self.lng), axis=1)
-        except Exception as ex:
-            print('# Info: no ML in DB detected')
-
-        self.df_dbf = self.df_dbf.replace({'nan': '', 'NaN': '', float('NaN'): '', -1111111: ''})
-
-        print("# DB load status: Loaded successfully!\n")
-
-        return self.df_dbf
 
     def df_replace(self, df_what, replace_column_name, change_class=False, fea=False, ftype=False):
 
-        for i, row in df_what.iterrows():
-            if i < len(df_what):
-                f_ID = int(df_what.loc[i]['ID'])
+        if replace_column_name in self.df_dbf.columns:
+            for i, row in df_what.iterrows():
+                if i < len(df_what):
+                    f_ID = int(df_what.loc[i]['ID'])
 
-                if fea is False and ftype is False:
-                    f_ID_DSCR = str(df_what.loc[i][self.lng])
-                if fea is True:
-                    f_ID_DSCR = str(df_what.loc[i][f'FEA_{self.lng}'])
-                if ftype is True:
-                    f_ID_DSCR = str(df_what.loc[i][f'TYPE_{self.lng}'])
-                # print(i, " - ", f_ID, " - ", f_ID_DSCR)
-                self.df_dbf.loc[self.df_dbf[replace_column_name] == f_ID, replace_column_name] = f_ID_DSCR
-                if change_class is True:
-                    f_ID_CLASS = str(df_what.loc[i]['KML_CLASS'])
-                    self.df_dbf.loc[self.df_dbf['#KML_CLASS'] == f_ID, '#KML_CLASS'] = f_ID_CLASS
+                    if fea is False and ftype is False:
+                        f_ID_DSCR = str(df_what.loc[i][self.lng])
+                    if fea is True:
+                        f_ID_DSCR = str(df_what.loc[i][f'FEA_{self.lng}'])
+                    if ftype is True:
+                        f_ID_DSCR = str(df_what.loc[i][f'TYPE_{self.lng}'])
+                    # print(i, " - ", f_ID, " - ", f_ID_DSCR)
+                    self.df_dbf.loc[self.df_dbf[replace_column_name] == f_ID, replace_column_name] = f_ID_DSCR
+                    if change_class is True:
+                        f_ID_CLASS = str(df_what.loc[i]['KML_CLASS'])
+                        self.df_dbf.loc[self.df_dbf['#KML_CLASS'] == f_ID, '#KML_CLASS'] = f_ID_CLASS
         # print("Replace ", replace_column_name, " done")
 
     def fea_type_parse(self):
@@ -364,19 +431,15 @@ def export_default(dbf_path):
     exp = df_dbf.convert_dbf(dbf_path=path, lang=lang, diameter=diam)
 
     total_columns = exp.columns.values.tolist()
-
     default_columns_list = read_template("Default")
 
-    template_columns_index, template_columns_names = df_dbf.parse_columns(
-        columns_list=default_columns_list)
+    # получаем пересечение Шаблона с имеющимися столбцами
+    cross_columns_df = df_dbf.parse_columns_df(columns_list=default_columns_list, cross_list=total_columns)
 
-    # возвращаем пересечение от шаблона к имеющимся
-    cross_columns = cross_columns_list(total_columns, template_columns_index)
-    # возвращаем столбец что нашли и их перевод для Дэфолтного
-    cross_columns_return, column_names_cross = df_dbf.parse_columns(columns_list=cross_columns)
+    cross_columns = cross_columns_df['COL_ID'].tolist()
+    column_names = cross_columns_df['COL_NAME'].tolist()
 
     exp1 = exp[cross_columns]
-    column_names = column_names_cross
 
     absbath = os.path.dirname(path)
     basename = os.path.basename(path)
@@ -393,8 +456,7 @@ def export_default(dbf_path):
         exportpath_csv = f'{exportpath[:-4]}_1.csv'
         to_csv_custom_header(df=exp1, csv_path=exportpath_csv, column_names=column_names, csv_encoding=csv_encoding)
 
-    input("~~~ Done~~~")
-
+    input("~~~ Export Successful ~~~")
 
 # сохраняем в csv c custom столбцами
 def to_csv_custom_header(df, csv_path, column_names, csv_encoding):
@@ -446,6 +508,7 @@ if __name__ == '__main__':
         path = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\Test\3nocm.DBF"
     else:
         arg = ''
+        arg = r"d:\WORK\UganskNeftegaz\NYU 12 inch НН Узел 3 - УПН-4, 7.788 км\Reports\PR\Database\1nyup.dbf"
 
         if arg != '':
             path = arg

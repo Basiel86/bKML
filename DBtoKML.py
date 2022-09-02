@@ -328,14 +328,18 @@ class bKML:
         for elem_id in range(len(kml_data)):
             current_coord = [(kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 1])]
             feature_line.append((kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 1]))
-            point = tmp_points_folder.newpoint(name=kml_data.iloc[elem_id, 0], coords=current_coord,
+            point_descr = kml_data.iloc[elem_id, 0]
+
+            # точки с GPS TMP не пишем
+            if 'отвод' not in point_descr:
+                point = tmp_points_folder.newpoint(name=point_descr, coords=current_coord,
                                                visibility=point_visibility)
-            if feature_name in ['Маркер', 'Marker']:
-                point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/flag.png'
-            else:
-                point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png'
-            point.style.labelstyle.scale = 0.9
-            point.style.iconstyle.scale = 0.8
+                if feature_name in ['Маркер', 'Marker']:
+                    point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/flag.png'
+                else:
+                    point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png'
+                point.style.labelstyle.scale = 0.9
+                point.style.iconstyle.scale = 0.8
 
         if line_visibility == 1:
             tmp_lines_folder = tmp_folder.newfolder(name=lname)
@@ -349,6 +353,10 @@ class bKML:
         self.line_width = line_width
         dbf_conf_init = DF_DBF.df_DBF()
         df_DBF_raw = dbf_conf_init.convert_dbf(diameter=self.diameter, dbf_path=self.dbf_path, lang=self.lang)
+
+        # не берем в расчет отремонтированные
+        df_DBF_raw = df_DBF_raw[df_DBF_raw['#DOC'] != 'T']
+
         meter = meter_lang[self.lang]
 
         weld_list = dbf_conf_init.get_welds_list()
@@ -426,6 +434,8 @@ class bKML:
                 top_kml_data = current_anom_df[["OTH_DESCR", '#LAT', '#LONG']]
                 isvisible = [1, 0]
                 points_folder = False
+
+            # add_to_line = True if current_anom_name == "GPS TMP" else False
 
             self.kml_write_top_lvl(feature_name=current_anom_name, kml_data=top_kml_data,
                                    isvisible=isvisible, points_folder=points_folder)

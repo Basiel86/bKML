@@ -1,12 +1,13 @@
 import os
 import unicodedata
 import re
+import subprocess
 
-from resource_path import resource_path
 from Export_columns import exp_format
 import json
 
-template_folder_name = resource_path(r'# Custom Templates')
+template_folder_name = os.path.expanduser(r'~\Documents\DB Process\# Custom Templates')
+# template_folder_name = resource_path(r'# Custom Templates')
 
 
 def _check_templates_folder():
@@ -16,6 +17,7 @@ def _check_templates_folder():
     """
     if not os.path.exists(template_folder_name):
         os.makedirs(template_folder_name)
+        print(f"### Info: Default templates folder created: {template_folder_name}")
 
     default_template_path = os.path.join(template_folder_name, "Default.json")
     if not os.path.exists(default_template_path):
@@ -28,6 +30,10 @@ def get_templates_folder_path() -> str:
     """
 
     return template_folder_name
+
+
+def open_templates_folder():
+    subprocess.Popen(fr'explorer /select,{template_folder_name}')
 
 
 def get_templates_list() -> list:
@@ -73,12 +79,13 @@ def save_template(template_name: str, columns_list: list):
     """
     Сохраняем шаблон в JSON
     """
-    template_name_valid = slugify(template_name).capitalize()
+    template_name_valid = slugify(template_name)
     template_path = os.path.join(get_templates_folder_path(), template_name_valid + '.json')
 
     if not os.path.exists(template_path):
         with open(template_path, 'w', encoding='utf8') as file:
             file.write(json.dumps(columns_list, indent=3, ensure_ascii=False))
+            print("### Info: Template Saved!")
     else:
         print("### Error: Template already exist with the same name!")
 
@@ -101,10 +108,11 @@ def slugify(value, allow_unicode=True):
         value = unicodedata.normalize('NFKC', value)
     else:
         value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
-    value = re.sub(r'[^\w\s-]', '', value.lower())
-    return re.sub(r'[-\s]+', '-', value).strip('-_')
+
+    value = re.sub(r'[^\w\s-]', '', value)
+    return value
 
 
 if __name__ == '__main__':
-    z = read_template("Заебись шаблон")
-    print(z)
+    z = "Ямал FR"
+    print(slugify(z))

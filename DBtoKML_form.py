@@ -3,10 +3,8 @@ import os
 import DBtoKML
 from tkinter import filedialog as fd
 from datetime import datetime, date
-import pandas as pd
 import parse_inch
 from parse_inch import parse_inch_prj
-import traceback
 
 EXP_DAY = '2022-10-01'
 

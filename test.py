@@ -1,7 +1,9 @@
-import pandas as pd
+import DF_DBF
 from DF_DBF import *
+import time
 # столбцы для дэфолтного экспорта
-from Export_columns import exp_format
+from Export_columns import exp_format, exp_format2
+
 
 
 def cross_columns_list(list_exist, list_target):
@@ -48,10 +50,19 @@ tmp_df.sort_values(['tag', 'index_column'], ascending=[True, False], inplace=Tru
 if __name__ == '__main__':
     df_dbf = df_DBF()
 
-    a, b = df_dbf.parse_columns(columns_list=exp_format)
+    print("Started...\n")
 
-    print(a)
-    print(b)
+    default_columns_list = read_template("Default")
+
+    cross_columns_df = df_dbf.parse_columns_df(columns_list=default_columns_list, cross_list=exp_format, ret_blank=False)
+
+    cross_columns = cross_columns_df['COL_ID'].tolist()
+    column_names = cross_columns_df['COL_NAME'].tolist()
+
+
+    print(cross_columns)
+    print(column_names)
+
     # print(isml)
     # process_columns_df = pd.DataFrame(columns=['COL_INDEX', 'COL_NAME'])
     # process_columns_df = process_columns_df.append({'COL_INDEX': 1, 'COL_NAME': 11}, ignore_index=True)
