@@ -1,10 +1,12 @@
 from tkinter import *
 import os
+import pyfiglet
 import DBtoKML
 from tkinter import filedialog as fd
 from datetime import datetime, date
 import parse_inch
 from parse_inch import parse_inch_prj
+from parse_cfg import CFG
 
 EXP_DAY = '2022-10-01'
 
@@ -17,7 +19,6 @@ dbf_ext_list = ['dbf', 'DBF']
 inch_names_list = parse_inch.get_inch_names_list()
 inch_list = parse_inch.get_inch_list()
 inch_dict = parse_inch.get_inch_dict()
-
 
 # diam_list = [4, 4.5, 5.563, 6.625, 8.625, 10.75, 12.75, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38,
 #              40, 42, 44, 46, 48, 52, 56]
@@ -45,7 +46,7 @@ def write_log(filepath=""):
                        f'{filepath}\n')
         log_file.close()
     except Exception as ex:
-        print("LOG Error: ", ex)
+        print("LOG Error")
 
 
 def DBFtoKML():
@@ -97,12 +98,22 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
+# def line_width_callback(*args):
+#     cfg.store_settings(section="GENERAL", key='line_width', value=line_width_variable.get())
+
+
 def on_closing():
+    cfg.store_settings(section="GENERAL", key='line_width', value=line_width_variable.get())
     userForm.destroy()
     sys.exit()
 
 
+# 'kban' 'larry3d'
+print('\n' + pyfiglet.figlet_format("DBf to KML", justify='center', font='larry3d'))
+
 userForm = Tk()
+
+cfg = CFG('DBF to KML')
 
 # читаем аргументы на входе
 arg = ''
@@ -134,18 +145,23 @@ if exp_date_formatted >= now_date:
 
     line_width_label = Label(userForm, text="Line Width")
     line_width_variable = StringVar(userForm)
+    # line_width_variable.trace("w", line_width_callback)
     line_width_combobox = OptionMenu(userForm, line_width_variable, *line_width)
-    line_width_variable.set(3)
+
+    cfg_line_width = cfg.read_cfg(section="GENERAL", key='line_width')
+    if cfg_line_width not in line_width:
+        line_width_variable.set(3)
+    else:
+        line_width_variable.set(cfg_line_width)
 
     inchLabel = Label(userForm, text="Diam")
     diam_list_variable = StringVar(userForm)
     diam_combobox = OptionMenu(userForm, diam_list_variable, *inch_names_list)
 
-
     myLabel.grid(row=0, column=0, columnspan=10)
     path_textbox.grid(row=1, column=0, columnspan=10)
 
-    myButon.grid(row=2, column=0, sticky=W+E, padx=5, pady=5)
+    myButon.grid(row=2, column=0, sticky=W + E, padx=5, pady=5)
 
     inchLabel.grid(row=2, column=2, sticky=E)
     diam_combobox.grid(row=2, column=3, sticky=W)

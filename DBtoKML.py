@@ -217,8 +217,9 @@ class bKML:
                                 feature_line.append(
                                     (current_range_df.iloc[elem_id, 2], current_range_df.iloc[elem_id, 1]))
                                 point = tmp_points_folder.newpoint(name=current_range_df.iloc[elem_id, 0],
-                                                                   coords=current_coord,
-                                                                   visibility=point_visibility)
+                                                                    coords=current_coord,
+                                                                    visibility=point_visibility)
+
 
                                 point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes' \
                                                                   '/placemark_circle.png '

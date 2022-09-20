@@ -1,3 +1,12 @@
+import pyfiglet
+
+
+def print_all_pyfiglet():
+    fig = pyfiglet.Figlet()
+    for font in fig.getFonts():
+        print(font + '\n\n' + pyfiglet.figlet_format('DBF to KML', font=font), '\n\n')
+
+
 def empty_if_nan(poss_nan):
     if str(poss_nan) == 'nan':
         return ''
@@ -11,9 +20,9 @@ def dbf_feature_type_combine(fea_code_replace_ft, har_code1, har_code2, corr, de
     har_code2_ft = ''
     if fea_code_replace_ft in ft_list:
         fea_code_replace_ft = fea_code_replace_ft
-    if har_code1 in ft_list:
+    if har_code1 in ft_list or isinstance(har_code1, int):
         har_code1_ft = empty_if_nan(har_code1)
-    if har_code2 in ft_list:
+    if har_code2 in ft_list or isinstance(har_code2, int):
         har_code2_ft = empty_if_nan(har_code2)
 
     corr = empty_if_nan(corr)
@@ -37,13 +46,15 @@ def dbf_feature_type_combine(fea_code_replace_ft, har_code1, har_code2, corr, de
 
 
 def dbf_description_combine(har_code1, har_code2, corr, description, ft_list, d_list):
-
     har_code1_d = ''
     har_code2_d = ''
 
-    if har_code1 in d_list:
+    if har_code2 == 65545:
+        pass
+
+    if har_code1 in d_list or isinstance(har_code1, int):
         har_code1_d = empty_if_nan(har_code1)
-    if har_code2 in d_list:
+    if har_code2 in d_list or isinstance(har_code2, int):
         har_code2_d = empty_if_nan(har_code2)
 
     corr = empty_if_nan(corr)
@@ -64,3 +75,7 @@ def dbf_description_combine(har_code1, har_code2, corr, description, ft_list, d_
 
     return description_return
 
+
+if __name__ == '__main__':
+    print_all_pyfiglet()
+    input("Press Any Key")

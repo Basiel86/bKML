@@ -146,10 +146,10 @@ def parse_inch_combine(file_path):
 
 
 if __name__ == '__main__':
-    path = r"d:\WORK\SalymPetroleum\NWA 20 inch UPN-PSN, 88 km\Reports\FR\Database\1nwam.DBF"
+    path = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\Test\Database_копия\1pbja.DBF"
 
     inch2 = parse_inch_prj(path)
 
-    print(inch_list.index(inch2))
+    print(inch2)
 
 

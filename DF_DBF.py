@@ -3,13 +3,15 @@ import pandas as pd
 import numpy as np
 import sys
 from simpledbf import Dbf5
-from parse_inch import parse_inch_path
+from parse_inch import parse_inch_prj, parse_inch_combine
 from dimm import dimm
 import errno
 from other_functions import dbf_feature_type_combine
 from other_functions import dbf_description_combine
 from parse_templates import read_template
 import traceback
+
+import time
 
 # столбцы для дэфолтного экспорта
 from Export_columns import exp_format
@@ -18,6 +20,10 @@ index_filename_remote_path = r'\\vasilypc\Vasily Shared (Read Only)\_Templates\P
 index_filename_local_path = r'IDs\DBF_INDEX.xlsx'
 struct_filename_remote_path = r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\STRUCT.xlsx'
 struct_filename_local_path = r'IDs\STRUCT.xlsx'
+
+
+def print_time_spent(time_start, time_end, descr=""):
+    print(f"### Time spent {descr}: {round(time_end - time_start, 3)}")
 
 
 def same_as_upper(col: pd.Series) -> pd.Series:
@@ -45,12 +51,15 @@ def resource_path(relative_path):
 # Берем версию с компа или удаленно
 def remote_or_local(remote_path, local_path):
     filename = os.path.basename(remote_path)[:-5]
-    if os.path.exists(remote_path):
-        print(f"# Info: {filename} file info: Remote")
-        return remote_path
-    else:
-        print(f"# Info: {filename} file info: Local")
-        return resource_path(local_path)
+    try:
+        if os.path.exists(remote_path):
+            print(f"# Info: {filename} file info: Remote")
+            return remote_path
+        else:
+            print(f"# Info: {filename} file info: Local")
+            return resource_path(local_path)
+    except Exception as ex:
+        input(ex)
 
 
 class df_DBF:
@@ -246,20 +255,26 @@ class df_DBF:
 
         self.lng = lang
 
+        ts = time.time()
         self.load_dbf(dbf_path=dbf_path)
+        #print_time_spent(ts, time.time(), descr="'DBF Load'")
+
 
         if diameter < 100:
             diameter = diameter * 25.4
 
+        tsr = time.time()
         self.df_replace(self.df_index_fea_code, '#FEA_CODE_REPLACE', change_class=True)
-
         self.df_replace(self.df_index_fea_code, '#FEATURE', fea=True)
         self.df_replace(self.df_index_fea_code, '#FEA_CODE_REPLACE_FT', ftype=True)
-
         self.df_replace(self.df_index_har_code1, '#HAR_CODE1_REPLACE')
         self.df_replace(self.df_index_har_code2, '#HAR_CODE2_REPLACE')
         self.df_replace(self.df_index_fea_type, '#LOC')
         self.df_replace(self.df_index_rep_method, '#REP_METHOD')
+
+        #print_time_spent(tsr, time.time(), descr="'REPLACE'")
+
+        ts = time.time()
 
         # exportpath = r'd:\WORK\OrenburgNeft\NOA 8 inch DNS Olhovskaya to Terminal Service, 19.749 km\Reports\PR\Run3\DB_corr dist\123.csv'
         # self.df_dbf.to_csv(exportpath, encoding='cp1251', index=False)
@@ -360,14 +375,16 @@ class df_DBF:
 
             print("# DB load status: Loaded successfully!\n")
 
+            # print_time_spent(ts, time.time(), descr="'DBF Convert to DF'")
+
             return self.df_dbf
 
         except ValueError:
+            print(traceback.format_exc())
             input("\n### Error: DB Error, try process it by DBFnewColumns and repeat, if So, call Developer!")
         except Exception as ex:
             print(ex)
             input(traceback.format_exc())
-
 
     def df_replace(self, df_what, replace_column_name, change_class=False, fea=False, ftype=False):
 
@@ -407,7 +424,7 @@ def export_default(dbf_path):
 
     print(f'### Fast Export path: {dbf_path}')
 
-    diam = parse_inch_path(path)
+    diam = parse_inch_prj(path)
 
     # если не нашли - просим ввести дюймаж
     if diam is None:
@@ -421,7 +438,7 @@ def export_default(dbf_path):
         # если ввели пустоту
         else:
             # ищем дюймаж в пути файла
-            diam = parse_inch_path(path)
+            diam = parse_inch_prj(path)
             # если и в пути нет, то пишем дефолтный
             if diam is None:
                 print("# Default diameter = 8.625 inch")
@@ -458,9 +475,10 @@ def export_default(dbf_path):
 
     input("~~~ Export Successful ~~~")
 
+
 # сохраняем в csv c custom столбцами
 def to_csv_custom_header(df, csv_path, column_names, csv_encoding):
-    print(f'# Custom headers info: Total columns: {len(column_names)}')
+    print(f'# Columns saved: {len(column_names)}')
     # print(f'# Custom headers info: Columns list: {column_names}')
 
     with open(csv_path, 'w') as csvfile:
@@ -508,7 +526,6 @@ if __name__ == '__main__':
         path = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\Test\3nocm.DBF"
     else:
         arg = ''
-        arg = r"d:\WORK\UganskNeftegaz\NYU 12 inch НН Узел 3 - УПН-4, 7.788 км\Reports\PR\Database\1nyup.dbf"
 
         if arg != '':
             path = arg

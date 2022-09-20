@@ -2,6 +2,7 @@ import os
 import unicodedata
 import re
 import subprocess
+from tkinter import messagebox
 
 from Export_columns import exp_format
 import json
@@ -58,6 +59,8 @@ def read_template(template_name: str) -> list:
             template_columns = json.load(json_file)
             return template_columns
     else:
+        messagebox.showwarning(f'Read template Warning', f"<{template_name}> template is not exist!!",
+                               icon='warning')
         print("### Error: Template file is not exist!")
         return []
 
@@ -71,7 +74,10 @@ def delete_template(template_name: str):
 
         if os.path.exists(template_path):
             os.remove(template_path)
+        messagebox.showwarning(f'Delete template Info', f"<{template_name}> deleted.",
+                               icon='info')
     else:
+        messagebox.showwarning(f'Delete template Info', f"You can't delete <{template_name}> template!", icon='info')
         print("### Info: Default template file deletion is prohibited!")
 
 
@@ -85,16 +91,19 @@ def save_template(template_name: str, columns_list: list):
     if not os.path.exists(template_path):
         with open(template_path, 'w', encoding='utf8') as file:
             file.write(json.dumps(columns_list, indent=3, ensure_ascii=False))
+            messagebox.showwarning(f'Save template Info', f"<{template_name}> template Saved",
+                                   icon='info')
             print("### Info: Template Saved!")
     else:
-        print("### Error: Template already exist with the same name!")
+        messagebox.showwarning(f'Save template Warning', f"<{template_name}> template already exists!!", icon='warning')
+        print(f"### Error: <{template_name}> template already exists!!")
 
 
 def rewrite_template(template_name: str, columns_list: list):
 
     template_path = os.path.join(get_templates_folder_path(), template_name + '.json')
     if os.path.exists(template_path):
-        open('file.txt', 'w').close()
+        # open('file.txt', 'w').close()
         with open(template_path, 'w', encoding='utf8') as file:
             file.write(json.dumps(columns_list, indent=3, ensure_ascii=False))
 

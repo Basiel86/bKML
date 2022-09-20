@@ -3,7 +3,8 @@ import pandas as pd
 import json
 from resource_path import resource_path
 
-stat_file_name = resource_path('# columns_counts.json')
+stat_file_name = os.path.expanduser(r'~\Documents\DB Process\# columns_counts.json')
+# stat_file_name = resource_path('# columns_counts.json')
 
 
 def load_columns_stat_dict():
