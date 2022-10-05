@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*- 
 import pathlib
 from tkinter import *
 from tkinter import ttk
@@ -12,20 +13,38 @@ from tkinter import filedialog as fd
 from DF_DBF import df_DBF
 from backup_save import BackupFile
 import pyfiglet
+from parse_cfg import CFG
+import sys
 
 
 class DBFHelper:
     def __init__(self):
-        self.EXP_DAY = '2022-09-20'
+        self.EXP_DAY = '2022-10-20'
         self.backup_delay = 15
-        print('\n' + pyfiglet.figlet_format("DBf Halper", justify='center', font='larry3d'))
+        print('\n' + pyfiglet.figlet_format("DBf Helper", justify='center', font='larry3d'))
         self.window = TkinterDnD.Tk()
         self.window.resizable(False, False)
         self.window.attributes('-topmost', True)
         # убираем windows стандатрные кнопки
         self.window.attributes('-toolwindow', True)
         # self.window.attributes('-transparentcolor', "white")
-        self.dbf_class = df_DBF()
+
+        self.cfg = CFG('DBF Helper')
+
+        index_cfg_path = self.cfg.read_cfg(section="PATHS", key="index_custom", create_if_none=True)
+        struct_cfg_path = self.cfg.read_cfg(section="PATHS", key="struct_custom", create_if_none=True)
+        index_remote_path = self.cfg.read_cfg(section="PATHS", key="index_share", create_if_none=True,
+                                              default=r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\DBF_INDEX.xlsx')
+        struct_remote_path = self.cfg.read_cfg(section="PATHS", key="struct_share", create_if_none=True,
+                                               default=r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\STRUCT.xlsx')
+        local = self.cfg.read_cfg(section="PATHS", key="local", create_if_none=True, default=False)
+
+        self.df_dbf_class = df_DBF(index_remote_path=index_remote_path,
+                                   index_path=index_cfg_path,
+                                   struct_remote_path=struct_remote_path,
+                                   struct_path=struct_cfg_path,
+                                   local=local)
+
         self.dbf_path = ""
         self.dbf_filename = ""
 
@@ -39,6 +58,9 @@ class DBFHelper:
         # -topmost
 
         self.columns_raw_list = ['No Columns']
+
+        self.act_file_frame = ttk.Labelframe(master=self.window, text='Active File', width=50, height=50)
+        self.act_file_label = ttk.Label(master=self.act_file_frame, text='-'*10)
 
         self.file_frame = ttk.Labelframe(master=self.window, text='DBF', width=50, height=50)
         self.open_button = Button(master=self.file_frame, text='Open a File', command=self.select_file)
@@ -58,12 +80,14 @@ class DBFHelper:
         self.window.drop_target_register(DND_FILES)
         self.window.dnd_bind('<<Drop>>', self.open_with_dnd)
 
-        self.place_elements()
+
 
         exp_date_formatted = datetime.strptime(self.EXP_DAY, "%Y-%m-%d").date()
         now_date = date.today()
         days_left = exp_date_formatted - now_date
         if exp_date_formatted >= now_date:
+
+            self.place_elements()
             # self.window.title(f'DBF Helper, expires in (days): {days_left.days}')
             self.set_window_title()
             self.window.geometry("200x500")
@@ -71,13 +95,13 @@ class DBFHelper:
             self.window.wm_iconbitmap(ico_abs_path)
         else:
             self.window.title('DBF Helper - EXPIRED')
-            self.window.geometry("300x50")
+            self.window.geometry("200x50")
             self.window.resizable(False, False)
 
             exp_label = Label(master=self.window, text="Your version has expired", fg='red', font=15)
-            exp_label.pack()
+            exp_label.grid(row=0, column=0, sticky=EW, columnspan=3)
             exp_label2 = Label(master=self.window, text="Please update", fg='red', font=15)
-            exp_label2.pack()
+            exp_label2.grid(row=2, column=0, sticky=EW, columnspan=3)
 
         self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
 
@@ -99,7 +123,11 @@ class DBFHelper:
 
     # stay_on_top()
     def set_window_title(self):
-        self.window.title(f'DBF Helper: {self.dbf_filename}')
+        self.window.title(f'DBF Helper')
+        # self.window.title(f'DBF Helper: {self.dbf_filename}')
+
+    def set_act_file_label(self):
+        self.act_file_label.config(text=self.dbf_filename)
 
     def columns_list_update(self):
         self.dbf_columns_combobox["values"] = self.columns_raw_list
@@ -110,20 +138,23 @@ class DBFHelper:
 
     def place_elements(self):
 
-        self.file_frame.grid(row=0, column=0, sticky=EW, columnspan=3)
-        self.open_button.grid(row=0, column=0, padx=2, pady=2)
-        self.update_dbf_button.grid(row=0, column=1, padx=2, pady=2)
-        self.open_in_excel_button.grid(row=0, column=2, padx=2, pady=2)
+        self.act_file_frame.grid(row=0, column=0, sticky=EW, columnspan=3)
+        self.act_file_label.grid(row=0, column=0, sticky=EW, columnspan=3)
 
-        self.backup_frame.grid(row=1, column=0, sticky=EW, columnspan=3)
-        self.save_backup_button.grid(row=1, column=0, sticky=W + S, padx=2, pady=5)
+        self.file_frame.grid(row=1, column=0, sticky=EW, columnspan=3)
+        self.open_button.grid(row=1, column=0, padx=2, pady=2)
+        self.update_dbf_button.grid(row=1, column=1, padx=2, pady=2)
+        self.open_in_excel_button.grid(row=1, column=2, padx=2, pady=2)
 
-        self.dbf_columns_frame.grid(row=2, column=0, columnspan=3, padx=2, pady=2, sticky=EW)
-        self.dbf_columns_combobox.grid(row=2, column=0, padx=2, pady=2)
+        self.backup_frame.grid(row=2, column=0, sticky=EW, columnspan=3)
+        self.save_backup_button.grid(row=2, column=0, sticky=W + S, padx=2, pady=5)
+
+        self.dbf_columns_frame.grid(row=3, column=0, columnspan=3, padx=2, pady=2, sticky=EW)
+        self.dbf_columns_combobox.grid(row=3, column=0, padx=2, pady=2)
         self.dbf_columns_combobox.configure(width=20)
 
-        self.f_clear_button.grid(row=5, column=0, columnspan=3, padx=2, pady=2, sticky=EW)
-        self.f_doc_button.grid(row=6, column=0, padx=2, pady=2, sticky=EW)
+        self.f_clear_button.grid(row=6, column=0, columnspan=3, padx=2, pady=2, sticky=EW)
+        self.f_doc_button.grid(row=7, column=0, padx=2, pady=2, sticky=EW)
 
     def open_with_dnd(self, event):
         if event.data[0] == '{':
@@ -133,7 +164,7 @@ class DBFHelper:
         if dnd_path.endswith(('.DBF', '.dbf')):
             self.dbf_path = dnd_path
             self.dbf_filename = os.path.basename(dnd_path)
-            self.set_window_title()
+            self.set_act_file_label()
             headers = self.update_dbf()
 
             self.columns_raw_list = headers
@@ -153,7 +184,7 @@ class DBFHelper:
         if pathlib.Path(file_path).suffix.lower() == ".dbf":
             self.dbf_path = file_path
             self.dbf_filename = os.path.basename(file_path)
-            self.set_window_title()
+            self.set_act_file_label()
             self.update_dbf()
             self.backup_auto_class = BackupFile(self.dbf_path, mode='auto')
             self.save_backup_auto()

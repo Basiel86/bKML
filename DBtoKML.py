@@ -2,6 +2,7 @@ import simplekml
 import DF_DBF
 import os
 import traceback
+from parse_cfg import CFG
 
 ml_range_colors = {'0-10': [99, 190, 123],
                    '10-20': [138, 201, 125],
@@ -39,6 +40,7 @@ def get_pname_lname(lang="EN"):
 class bKML:
     def __init__(self, dbf_path, diameter, lang="RU"):
 
+        self.cfg = CFG('DBF to KML')
         self.dbf_path = dbf_path
         self.lang = lang
         self.diameter = diameter
@@ -352,7 +354,20 @@ class bKML:
     def dbf_to_kml(self, line_width):
 
         self.line_width = line_width
-        dbf_conf_init = DF_DBF.df_DBF()
+
+        index_cfg_path = self.cfg.read_cfg(section="PATHS", key="index_custom", create_if_none=True)
+        struct_cfg_path = self.cfg.read_cfg(section="PATHS", key="struct_custom", create_if_none=True)
+        index_remote_path = self.cfg.read_cfg(section="PATHS", key="index_share", create_if_none=True,
+                                              default=r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\DBF_INDEX.xlsx')
+        struct_remote_path = self.cfg.read_cfg(section="PATHS", key="struct_share", create_if_none=True,
+                                               default=r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\STRUCT.xlsx')
+        local = self.cfg.read_cfg(section="PATHS", key="local", create_if_none=True, default=False)
+
+        dbf_conf_init = DF_DBF.df_DBF(index_remote_path=index_remote_path,
+                                   index_path=index_cfg_path,
+                                   struct_remote_path=struct_remote_path,
+                                   struct_path=struct_cfg_path,
+                                   local=local)
         df_DBF_raw = dbf_conf_init.convert_dbf(diameter=self.diameter, dbf_path=self.dbf_path, lang=self.lang)
 
         # не берем в расчет отремонтированные

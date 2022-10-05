@@ -22,3 +22,6 @@ class PlaySound(object):
     def stop_music(self):
         self.mixer.music.stop()
 
+if __name__ == '__main__':
+    s = PlaySound()
+

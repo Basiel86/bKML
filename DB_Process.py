@@ -14,22 +14,30 @@ import pyfiglet
 from parse_templates import *
 from play_sound import PlaySound
 from parse_cfg import CFG
+from TkinterDnD2 import *
 
 pd.options.mode.chained_assignment = None  # default='warn'
-
-sound_path = r'c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\Sounds\Duck.mp3'
 
 
 class DB_FORM:
 
     def __init__(self):
 
-        self.EXP_DAY = '2022-10-01'
+        self.EXP_DAY = '2022-10-15'
         # 'fender' 'kban' 'larry3d'
         print('\n' + pyfiglet.figlet_format("DB Process", justify='center', font='larry3d'))
         self.cfg = CFG('DB Process')
+
+        # self.updater_name = 'DB Process'
+        # self.updater = BUpdater(self.updater_name)
+        # z = self.updater.pre_update_check()
+        # print(z)
+
         self.lang_list = ["RU", "EN"]
-        self.dbf_ext_list = ['dbf', 'DBF']
+        self.db_ext_list = ('dbf', 'DBF')
+
+        self.db_path = ''
+
         # https://www.color-hex.com/popular-colors.php
         # Цвета Тэгов
         self.tags_colors = {"ANOM": '#ffc3a0',
@@ -57,7 +65,7 @@ class DB_FORM:
                                   'GPS_TMP': "GPS_TMP"}
 
         self.sound = PlaySound()
-        if self.cfg.read_cfg(section="SOUND", key="enable") is True:
+        if self.cfg.read_cfg(section="SOUND", key="enable", default=False) is True:
             self.play_sound()
 
         # Список Тэгов в текущем списке особенностей
@@ -70,63 +78,95 @@ class DB_FORM:
         # self.diam_list = [4, 4.5, 5.563, 6.625, 8.625, 10.75, 12.75, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38,
         #                   40, 42, 44, 46, 48, 52, 56]
 
-        self.df_dbf_class = df_DBF
+        index_cfg_path = self.cfg.read_cfg(section="PATHS", key="index_custom", create_if_none=True)
+        struct_cfg_path = self.cfg.read_cfg(section="PATHS", key="struct_custom", create_if_none=True)
+        index_remote_path = self.cfg.read_cfg(section="PATHS", key="index_share", create_if_none=True,
+                                              default=r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\DBF_INDEX.xlsx')
+        struct_remote_path = self.cfg.read_cfg(section="PATHS", key="struct_share", create_if_none=True,
+                                               default=r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\STRUCT.xlsx')
+        local = self.cfg.read_cfg(section="PATHS", key="local", create_if_none=True, default=False)
+
+        self.df_dbf_class = df_DBF(index_remote_path=index_remote_path,
+                                   index_path=index_cfg_path,
+                                   struct_remote_path=struct_remote_path,
+                                   struct_path=struct_cfg_path,
+                                   local=local)
         self.db_df = pd.DataFrame
 
-        self.db_process_form = Tk()
+        self.db_process_form = TkinterDnD.Tk()
+        self.db_process_form.drop_target_register(DND_FILES)
+        self.db_process_form.dnd_bind('<<Drop>>', self.open_with_dnd)
 
-        self.path_label = Label(self.db_process_form, text="DBF файл")
-        self.path_variable = StringVar(self.db_process_form)
-        self.path_textbox = Entry(self.db_process_form, width=70, textvariable=self.path_variable)
-        self.columns_label = Label(self.db_process_form, text="Custom Columns")
-        self.columns_variable = StringVar(self.db_process_form)
-        self.columns_textbox = Entry(self.db_process_form, width=70, textvariable=self.columns_variable)
+        self.menu = Menu(self.db_process_form)
+        self.db_process_form.config(menu=self.menu)
+
+        self.tabs_main = ttk.Notebook(self.db_process_form)
+        self.tab1 = ttk.Frame(self.tabs_main)
+        self.tab2 = ttk.Frame(self.tabs_main)
+        self.tab3 = ttk.Frame(self.tabs_main)
+        self.tab4 = ttk.Frame(self.tabs_main)
+        self.tabs_main.add(self.tab1, text='Columns')
+        self.tabs_main.add(self.tab2, text='Helper')
+        self.tabs_main.add(self.tab3, text='KML')
+        self.tabs_main.add(self.tab4, text='Other')
+
+        file_menu = Menu(self.menu, tearoff=0)
+        file_menu.add_command(label="Open...", command=self.openfile)
+        file_menu.add_command(label="Export")
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.on_closing)
+        self.menu.add_cascade(label="File",
+                              menu=file_menu)
+
+        # groove, raised, ridge, solid, or sunken
+        self.db_file_label = Label(self.db_process_form, text="-DB Name-", font=("Verdana", 12),
+                                   justify='center', foreground='red', relief='groove', padx=5, pady=5)
+
+        self.template_menu = Menu(self.menu, tearoff=0)
+        self.templates_radio_variable = StringVar()
+        self.update_menu_templates()
+        self.menu.add_cascade(label="Templates",
+                              menu=self.template_menu)
+
+        self.columns_variable = StringVar(self.tab1)
+        self.columns_textbox = Entry(self.tab1, textvariable=self.columns_variable)
+        self.columns_textbox.bind("<Return>", self.process_custom_columns)
+        self.clear_headers_button = Button(self.tab1, text="Clear", command=self.clear_headers)
+
         self.load_db_button = Button(self.db_process_form, text="Load DB", command=self.db_load)
         self.export_db_button = Button(self.db_process_form, text="to CSV", width=10, command=self.db_export)
         self.clipboard_db_button = Button(self.db_process_form, text="to Clip", width=10,
                                           command=lambda: self.db_export(to_clipboard=True))
-        self.clear_headers_button = Button(self.db_process_form, text="Clear", command=self.clear_headers)
+
 
         self.lang_list_variable = StringVar(self.db_process_form)
         self.lang_combobox = OptionMenu(self.db_process_form, self.lang_list_variable, *self.lang_list)
 
-        self.file_open_button = Button(self.db_process_form, text="Open file", command=self.openfile)
         self.blankLabel = Label(self.db_process_form, text="          ")
-        self.diam_label = Label(self.db_process_form, text="Diam")
 
-        self.custom_listbox_raw = Listbox(width=30, height=33, exportselection=False)
-        self.custom_listbox_processed = Listbox(width=30, height=33, exportselection=False)
-        self.db_columns_listbox = Listbox(width=35, height=33, exportselection=False)
+        self.custom_listbox_raw = Listbox(master=self.tab1, width=30, height=33, exportselection=False)
+        self.custom_listbox_processed = Listbox(master=self.tab1, width=30, height=33, exportselection=False)
+        self.db_columns_listbox = Listbox(master=self.tab1, width=35, height=33, exportselection=False)
+        self.scroll_pane = ttk.Scrollbar(master=self.tab1, command=self.db_columns_listbox.yview)
+        self.db_columns_listbox.configure(yscrollcommand=self.scroll_pane.set)
 
-        self.clear_process_list_button = Button(self.db_process_form, text="Clear", command=self.clear_process_listbox,
+        self.clear_process_list_button = Button(master=self.tab1, text="Clear", command=self.clear_process_listbox,
                                                 width=25)
-
         self.filter_variable = StringVar()
         self.filter_variable.trace("w", self.filter_total_columns_listbox)
-        self.filter_total_columns_textbox = Entry(self.db_process_form, width=35,
+        self.filter_total_columns_textbox = Entry(master=self.tab1, width=35,
                                                   textvariable=self.filter_variable)
-
-        self.process_custom_button = Button(self.db_process_form, text="Process Custom Columns",
-                                            command=self.process_custom_columns)
 
         self.diam_list_variable = StringVar(self.db_process_form)
         self.diam_combobox = OptionMenu(self.db_process_form, self.diam_list_variable, *self.inch_names_list)
 
-        self.templates_variable = StringVar(self.db_process_form)
-        self.templates_combobox = OptionMenu(self.db_process_form, self.templates_variable, *self.templates_list)
-        self.templates_combobox.configure(width=16)
-        self.templates_variable.set('Default')
-
         self.template_name_label = Label(self.db_process_form, text="New Template Name")
-        self.template_list_label = Label(self.db_process_form, text="Templates List")
         self.template_name_variable = StringVar(self.db_process_form)
         self.template_name_textbox = Entry(self.db_process_form, width=22, textvariable=self.template_name_variable)
 
         self.save_template_button = Button(self.db_process_form, text="Save template", command=self.save_template)
         self.rewrite_template_button = Button(self.db_process_form, text="Rewrite template",
                                               command=self.rewrite_template)
-        self.load_template_button = Button(self.db_process_form, text="Load template", command=self.load_template)
-        self.delete_template_button = Button(self.db_process_form, text="Delete template", command=self.delete_template)
         self.open_templates_folder_button = Button(self.db_process_form, text="Open Templates Folder",
                                                    command=parse_templates.open_templates_folder)
 
@@ -135,10 +175,12 @@ class DB_FORM:
         self.stat_tree.column("# 1", anchor='center', stretch='NO', width=60)
 
         self.stat_tree_tags_variable = StringVar(self.db_process_form)
+        self.stat_tree_tags_variable.trace(mode='w', callback=self.stat_tree_tags_option_change)
         self.stat_tree_tags_combobox = OptionMenu(self.db_process_form, self.stat_tree_tags_variable,
                                                   self.stat_tree_tags_list)
-        self.stat_tree_tags_select_button = Button(self.db_process_form, text="Select group",
-                                                   command=self.select_group_checks)
+        self.sel_all_checks = Button(self.db_process_form, text="Select All", command=self.select_all_checks)
+        self.remove_all_checks = Button(self.db_process_form, text="Clear All", command=self.remove_all_checks)
+        self.invert_checks = Button(self.db_process_form, text="Invert", command=self.invert_checks)
 
         self.doc_tree = CheckboxTreeview(self.db_process_form, show='tree', column="c1", height=5)
         self.doc_tree.column("# 0", anchor='center', stretch='YES', width=30)
@@ -148,16 +190,9 @@ class DB_FORM:
         self.marker_tree.column("# 0", anchor='center', stretch='YES', width=30)
         self.marker_tree.column("# 1", anchor='center', stretch='NO', width=60)
 
-        self.sel_all_checks = Button(self.db_process_form, text="Select All", command=self.select_all_checks)
-        self.remove_all_checks = Button(self.db_process_form, text="Clear All", command=self.remove_all_checks)
-        self.invert_checks = Button(self.db_process_form, text="Invert", command=self.invert_checks)
-
-        self.scroll_pane = ttk.Scrollbar(self.db_process_form, command=self.db_columns_listbox.yview)
-        self.db_columns_listbox.configure(yscrollcommand=self.scroll_pane.set)
-
-        self.play_button = Button(self.db_process_form, text="Play", command=self.play_sound,
+        self.play_button = Button(self.tab4, text="Play", command=self.play_sound,
                                   relief=GROOVE)
-        self.play_button_stop = Button(self.db_process_form, text="Stop", command=self.stop_sound,
+        self.play_button_stop = Button(self.tab4, text="Stop", command=self.stop_sound,
                                        relief=GROOVE)
 
         style = ttk.Style(self.db_process_form)
@@ -177,7 +212,7 @@ class DB_FORM:
 
         # Инициализация Базы
         self.lng = ''
-        self.df_dbf_class = df_DBF()
+        # self.df_dbf_class = df_DBF()
 
         self.form_init()
 
@@ -194,68 +229,64 @@ class DB_FORM:
         now_date = date.today()
         days_left = exp_date_formatted - now_date
 
-        ico_abs_path = resource_path('DBF_icon.ico')
+        ico_abs_path = resource_path('icons\DBF_icon.ico')
         self.db_process_form.wm_iconbitmap(ico_abs_path)
 
         if exp_date_formatted >= now_date:
 
             self.db_process_form.title("DB process")
-            self.db_process_form.geometry("1630x610")
-            self.db_process_form.minsize(1630, 600)
-            self.db_process_form.maxsize(1700, 650)
+            self.db_process_form.geometry("1240x610")
+            self.db_process_form.minsize(1240, 600)
+            self.db_process_form.maxsize(1240, 650)
 
-            col_span = 5
-            self.lang_combobox.grid(row=1, column=0, sticky=EW)
-            self.diam_label.grid(row=0, column=1, sticky=EW, columnspan=2)
-            self.diam_combobox.grid(row=1, column=1, sticky=EW, columnspan=2)
-            self.path_label.grid(row=1, column=3, columnspan=col_span)
-            self.path_textbox.grid(row=2, column=3, columnspan=col_span, sticky=EW)
+            self.lang_combobox.grid(row=0, column=0, columnspan=1)
+            self.diam_combobox.grid(row=2, column=0, sticky=EW, columnspan=2)
 
-            self.file_open_button.grid(row=2, column=0, sticky=EW, padx=2)
-            self.load_db_button.grid(row=2, column=1, sticky=EW, padx=2, columnspan=2)
+            self.db_file_label.grid(row=0, column=1, columnspan=1)
 
-            self.process_custom_button.grid(row=6, column=1, columnspan=col_span + 2)
-            self.columns_label.grid(row=3, column=1, columnspan=col_span + 2, sticky=EW)
-            self.columns_textbox.grid(row=5, column=1, columnspan=col_span + 2, sticky=EW)
-            self.clear_headers_button.grid(row=5, column=0, sticky=EW, padx=2)
+            self.load_db_button.grid(row=1, column=1, sticky=EW, padx=2, columnspan=1)
 
-            self.stat_tree.grid(row=2, column=9, rowspan=30, columnspan=3, padx=5, pady=5, sticky=N)
+            self.stat_tree.grid(row=2, column=9, rowspan=30, columnspan=3, padx=5, sticky=N)
             self.stat_tree.bind("<Double-1>", self.OnDoubleClick)
-            self.doc_tree.grid(row=2, column=12, rowspan=4, columnspan=2, sticky=N, pady=5)
+            self.doc_tree.grid(row=2, column=12, rowspan=4, columnspan=2, sticky=N)
             self.marker_tree.grid(row=6, column=12, rowspan=4, columnspan=2, sticky=NS)
 
-            self.stat_tree_tags_combobox.grid(row=1, column=9, padx=5, columnspan=2, pady=5, sticky=EW)
-            self.stat_tree_tags_select_button.grid(row=1, column=11, columnspan=1, padx=5, pady=5, sticky=EW)
+            self.stat_tree_tags_combobox.grid(row=1, column=9, padx=5, columnspan=3, sticky=EW)
+            self.stat_tree_tags_combobox.grid(row=1, column=9, padx=5, columnspan=3, sticky=EW)
 
-            self.sel_all_checks.grid(row=0, column=9, sticky=E + W + S, pady=2, padx=3)
-            self.remove_all_checks.grid(row=0, column=10, sticky=E + W + S, pady=2, padx=3)
-            self.invert_checks.grid(row=0, column=11, sticky=E + W + S, pady=2, padx=3)
+            self.sel_all_checks.grid(row=0, column=9, sticky=E + W + S, padx=3)
+            self.remove_all_checks.grid(row=0, column=10, sticky=E + W + S, padx=3)
+            self.invert_checks.grid(row=0, column=11, sticky=E + W + S, padx=3)
 
-            self.custom_listbox_raw.grid(row=2, column=20, rowspan=40, columnspan=2, padx=3, sticky=E)
-            self.custom_listbox_processed.grid(row=2, column=23, rowspan=40, columnspan=2)
-            self.db_columns_listbox.grid(row=2, column=25, rowspan=40, columnspan=2)
-            self.scroll_pane.grid(row=2, column=27, rowspan=40, columnspan=1, sticky=NS)
-
-            self.clear_process_list_button.grid(row=1, column=23, columnspan=2)
-            self.filter_total_columns_textbox.grid(row=1, column=25, columnspan=2)
-
-            self.template_name_label.grid(row=10, column=0, columnspan=2)
+            self.template_name_label.grid(row=10, column=0, columnspan=2, sticky=EW)
             self.template_name_textbox.grid(row=11, column=0, columnspan=2, padx=3, sticky=EW)
-            self.template_list_label.grid(row=12, column=0, columnspan=2)
-            self.templates_combobox.grid(row=13, column=0, columnspan=2)
-            self.open_templates_folder_button.grid(row=16, column=0, columnspan=2)
+            self.open_templates_folder_button.grid(row=16, column=0, columnspan=2, sticky=EW)
 
-            self.save_template_button.grid(row=11, column=2, padx=3)
-            self.rewrite_template_button.grid(row=11, column=3, padx=3)
-            self.delete_template_button.grid(row=11, column=4, padx=3, sticky=W)
+            self.save_template_button.grid(row=12, column=0, padx=3, sticky=EW, columnspan=2)
+            self.rewrite_template_button.grid(row=13, column=0, padx=3, sticky=EW, columnspan=2)
 
-            self.load_template_button.grid(row=13, column=2, columnspan=1)
+            self.clipboard_db_button.grid(row=15, column=12, sticky=EW)
+            self.export_db_button.grid(row=17, column=12, sticky=EW)
 
-            self.export_db_button.grid(row=13, column=4, sticky=W)
-            self.clipboard_db_button.grid(row=13, column=3)
+            # TABS
+            self.tabs_main.grid(row=0, column=14, columnspan=1, rowspan=40)
+            # TAB 1
 
-            self.play_button.grid(row=18, column=0, columnspan=1)
-            self.play_button_stop.grid(row=18, column=1, columnspan=1)
+            self.columns_textbox.grid(row=0, column=1, columnspan=1, sticky=EW)
+            self.clear_headers_button.grid(row=0, column=0, sticky=EW, padx=2, columnspan=1)
+
+            self.custom_listbox_raw.grid(row=1, column=0, rowspan=40, columnspan=2, padx=3, sticky=E)
+            self.custom_listbox_processed.grid(row=1, column=3, rowspan=40, columnspan=2)
+            self.db_columns_listbox.grid(row=1, column=5, rowspan=40, columnspan=2)
+            self.scroll_pane.grid(row=1, column=7, rowspan=40, columnspan=1, sticky=NS)
+            self.clear_process_list_button.grid(row=0, column=3, columnspan=2)
+            self.filter_total_columns_textbox.grid(row=0, column=5, columnspan=2)
+            # TAB 4
+            self.play_button.grid(row=0, column=0, columnspan=1)
+            self.play_button_stop.grid(row=0, column=1, columnspan=1)
+            # ----------------
+
+
 
             # self.db_columns_listbox.insert(1, "Data Structure")
             # self.db_columns_listbox.insert(2, "Algorithm")
@@ -295,15 +326,18 @@ class DB_FORM:
 
             if arg != '' and os.path.exists(arg):
                 # пишем аргумент в строку пути
-                self.path_variable.set(arg)
+                self.db_path = arg
                 # парсим инч
                 arg_inch = parse_inch_prj(arg)
+
                 # если нашли инч то селектим его в выпадающем списке
                 if arg_inch is not None:
                     inch_index = self.inch_list.index(arg_inch)
                     self.diam_list_variable.set(self.inch_names_list[inch_index])
+                    self.db_load()
                 else:
                     self.diam_list_variable.set(self.inch_names_list[6])
+                    self.db_file_label.config(text=os.path.basename(self.db_path))
             else:
                 self.diam_list_variable.set(self.inch_names_list[6])
 
@@ -332,6 +366,11 @@ class DB_FORM:
 
         self.db_process_form.mainloop()
 
+    def updater_run(self, exe_name):
+        args = self.updater_name
+        filename = 'B_Updater.exe'
+        subprocess.run([filename, args])
+
     def play_sound(self):
         self.sound.play_music()
         self.cfg.store_settings(section="SOUND", key="enable", value=True)
@@ -352,23 +391,25 @@ class DB_FORM:
                                    "Template name or Columns list is empty...",
                                    icon='warning')
             print("### Error: Template name or Columns list is empty...")
-        self.update_option_menu()
+        self.update_menu_templates()
 
     def delete_template(self):
 
-        template_name = self.templates_variable.get()
+        template_name = self.templates_radio_variable.get()
+
+        if template_name == '':
+            return None
 
         delete_msg_box = messagebox.askquestion(f'Delete template Warning', f'Delete <{template_name}> template?',
                                                 icon='warning')
 
         if delete_msg_box == 'yes':
-            template_name = self.templates_variable.get()
             delete_template(template_name)
-            self.update_option_menu()
-            self.templates_variable.set('Default')
+            self.update_menu_templates()
+            self.templates_radio_variable.set('Default')
 
     def rewrite_template(self):
-        template_name = self.templates_variable.get()
+        template_name = self.templates_radio_variable.get()
         columns_list = self.process_columns_df['COL_NAME'].tolist()
 
         rewrite_msb_box = messagebox.askquestion(f'Rewrite template Warning',
@@ -386,18 +427,29 @@ class DB_FORM:
                                        f"Columns list is Empty!",
                                        icon='warning')
                 print("### Error: Список столбцов пуст")
-            self.update_option_menu()
+            self.update_menu_templates()
 
-    def update_option_menu(self):
-        """
-        Рефреш Компобокса
-        """
+    def update_menu_templates(self):
+
+        self.template_menu.delete(0, 'end')
+
         self.templates_list = get_templates_list()
-        templates_combobox = self.templates_combobox["menu"]
-        templates_combobox.delete(0, "end")
-        for string in self.templates_list:
-            templates_combobox.add_command(label=string,
-                                           command=lambda value=string: self.templates_variable.set(value))
+        for template in self.templates_list:
+            self.template_menu.add_radiobutton(label=template, var=self.templates_radio_variable,
+                                               command=self.load_template)
+        self.template_menu.add_separator()
+        self.template_menu.add_command(label="Del Template", command=self.delete_template)
+
+    # def update_option_menu(self):
+    #     """
+    #     Рефреш Компобокса
+    #     """
+    #     self.templates_list = get_templates_list()
+    #     templates_combobox = self.templates_combobox["menu"]
+    #     templates_combobox.delete(0, "end")
+    #     for string in self.templates_list:
+    #         templates_combobox.add_command(label=string,
+    #                                        command=lambda value=string: self.templates_variable.set(value))
 
     def custom_listbox_processed_add(self, event):
 
@@ -505,6 +557,9 @@ class DB_FORM:
         self.stat_tree.insert('', 'end', text=4, values=4, tags=('ANOM',))
         self.stat_tree.insert('', 'end', text=5, values=5, tags=('CON',))
 
+    def stat_tree_tags_option_change(self, *args):
+        self.select_group_checks()
+
     def select_group_checks(self):
 
         """
@@ -562,6 +617,7 @@ class DB_FORM:
         stat_tree = self.stat_tree
         # Список ID
         tree_items = stat_tree.get_children()
+        self.stat_tree_tags_variable.set('')
 
         # Бежим по Айдишникам и печатаем характеристики (хранятся в словаре)
         # for each in tree_items:
@@ -577,6 +633,7 @@ class DB_FORM:
         stat_tree = self.stat_tree
         # Список ID
         tree_items = stat_tree.get_children()
+        self.stat_tree_tags_variable.set('')
 
         for tree_id in tree_items:
             self.stat_tree._uncheck_descendant(tree_id)
@@ -588,6 +645,7 @@ class DB_FORM:
         # Список ID
         tree_items = stat_tree.get_children()
         tree_checked = stat_tree.get_checked()
+        self.stat_tree_tags_variable.set('')
 
         for tree_id in tree_items:
             if tree_id in tree_checked:
@@ -649,14 +707,17 @@ class DB_FORM:
         for i in total_columns_exist_sorted_names:
             self.db_columns_listbox.insert('end', i)
 
-    def load_template(self):
+    def load_template(self, *args):
 
-        self.update_option_menu()
+        self.update_menu_templates()
 
-        template_name = self.templates_variable.get()
+        template_name = self.templates_radio_variable.get()
         template_columns_json = read_template(template_name=template_name)
 
+        if self.db_file_label['text'] == "-DB Name-":
+            return None
         try:
+
             total_columns_index = self.db_df.columns.values.tolist()
 
             template_columns_df = self.df_dbf_class.parse_columns_df(columns_list=template_columns_json,
@@ -701,14 +762,14 @@ class DB_FORM:
 
         except TypeError and AttributeError:
 
-            messagebox.showwarning(f'Error', "DB not Loaded",
-                                   icon='error')
+            # messagebox.showwarning(f'Error', "DB not Loaded",
+            #                        icon='error')
             print('# ERROR: DB not Loaded!')
 
-    def process_custom_columns(self):
+    def process_custom_columns(self, events=None):
 
         """
-        Кнопка Process Columns
+        Process Custom Columns
         Берем на вход строку, разбиваем по табулятор и находим соответствия
         """
 
@@ -814,15 +875,16 @@ class DB_FORM:
     # грузим базу
     def db_load(self):
 
-        db_path = str(self.path_textbox.get())
         self.lng = str(self.lang_list_variable.get())
         diam_list_value = self.diam_list_variable.get()
         diameter = self.inch_dict[diam_list_value]
 
-        if db_path != "" and db_path[-3:] in self.dbf_ext_list:
+        if self.db_path != "" and self.db_path[-3:] in self.db_ext_list:
+
+            self.db_file_label.config(text=os.path.basename(self.db_path))
 
             try:
-                self.db_df = self.df_dbf_class.convert_dbf(diameter=diameter, dbf_path=db_path, lang=self.lng)
+                self.db_df = self.df_dbf_class.convert_dbf(diameter=diameter, dbf_path=self.db_path, lang=self.lng)
 
                 # --------------------------------
                 # получаем статистику по фичам
@@ -896,7 +958,8 @@ class DB_FORM:
                 # self.process_custom_columns()
 
                 try:
-                    self.write_log(file_path=db_path)
+                    pass
+                    # self.write_log(file_path=db_path)
                 except Exception as logex:
                     print("LOG Error")
 
@@ -910,18 +973,44 @@ class DB_FORM:
             print("Путь не верен! Ты сбился с пути!?")
 
     def openfile(self):
-        filename = fd.askopenfilename(
+
+        last_path = os.path.dirname(self.db_path)
+
+        file_path = fd.askopenfilename(
             title='Open a file',
-            initialdir='/',
+            # initialdir='/',
+            initialdir=last_path,
             filetypes=[("DBF files", ".dbf .DBF")])
 
-        self.path_variable.set(filename)
+        self.db_path = file_path
 
-        path_inch = parse_inch_prj(filename)
+        path_inch = parse_inch_prj(file_path)
         # если нашли инч то селектим его в выпадающем списке
         if path_inch is not None:
             inch_index = self.inch_list.index(path_inch)
             self.diam_list_variable.set(self.inch_names_list[inch_index])
+            self.db_load()
+
+    def open_with_dnd(self, event):
+
+        if event.data[0] == '{':
+            dnd_path = event.data[1:-1]
+        else:
+            dnd_path = event.data
+
+        print("Drag-n-Drop Path: ", dnd_path)
+
+        if dnd_path.lower().endswith(self.db_ext_list):
+
+            self.db_path = dnd_path
+
+            path_inch = parse_inch_prj(dnd_path)
+            # если нашли инч то селектим его в выпадающем списке
+            if path_inch is not None:
+                inch_index = self.inch_list.index(path_inch)
+                self.diam_list_variable.set(self.inch_names_list[inch_index])
+                self.db_load()
+            self.db_file_label.config(text=os.path.basename(self.db_path))
 
     @staticmethod
     def resource_path(relative_path):
@@ -934,9 +1023,7 @@ class DB_FORM:
 
     def db_export(self, to_clipboard=False):
 
-        path = self.path_variable.get()
-
-        if path != '':
+        if self.db_path != '':
 
             # !!! ВРЕМЕННО фильтрация работает для каждого поля независимо
 
@@ -987,7 +1074,7 @@ class DB_FORM:
 
                     # messagebox.showwarning(f'Clipboard Export', "Copied to the clipboard.",
                     #                        icon='info')
-                    exp1.to_clipboard(sep=',', index=False)
+                    exp1.to_clipboard(sep='\t', index=False)
                     # exp1.to_clipboard(index=False)
                 else:
                     absbath = os.path.dirname(path)

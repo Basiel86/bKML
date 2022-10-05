@@ -56,7 +56,7 @@ class CFG(object):
         with open(self.cfg_path, 'w', encoding='utf8') as configfile:
             self.cfg.write(configfile)
 
-    def read_cfg(self, section, key):
+    def read_cfg(self, section, key, create_if_none=False, default=''):
 
         self.cfg.read(self.cfg_path)
         if self._check_key(section=section, key=key) is True:
@@ -71,15 +71,17 @@ class CFG(object):
             else:
                 return str(value)
         else:
+            if create_if_none is True or default != '':
+                self.store_settings(section=section, key=key, value=default)
             return None
 
 
 if __name__ == '__main__':
-
     cfg1 = CFG("PY_project")
-    cfg1.store_settings(section="GENERAL", key="size", value=20)
-    cfg1.store_settings(section="GENERAL", key="w_size", value=22)
-    cfg1.store_settings(section="OTHER", key="width", value=10)
-    cfg1.store_settings(section="OTHER", key="w_width", value="False1")
+    indext_path = cfg1.read_cfg(section="PATHS", key="INDEX_CUSTOM", create_if_none=True)
+    struct_path = cfg1.read_cfg(section="PATHS", key="STRUCT_CUSTOM", create_if_none=True)
 
-    print(cfg1.read_cfg(section="OTHER", key="w_width"))
+    print(indext_path)
+    print(struct_path)
+    # cfg1.store_settings(section="PATHS", key="INDEX_CUSTOM", value=20)
+    # cfg1.store_settings(section="PATHS", key="STRUCT_CUSTOM", value=20)

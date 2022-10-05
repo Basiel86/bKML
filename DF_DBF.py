@@ -16,9 +16,9 @@ import time
 # столбцы для дэфолтного экспорта
 from Export_columns import exp_format
 
-index_filename_remote_path = r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\DBF_INDEX.xlsx'
+# index_filename_remote_path = r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\DBF_INDEX.xlsx'
 index_filename_local_path = r'IDs\DBF_INDEX.xlsx'
-struct_filename_remote_path = r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\STRUCT.xlsx'
+# struct_filename_remote_path = r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\STRUCT.xlsx'
 struct_filename_local_path = r'IDs\STRUCT.xlsx'
 
 
@@ -48,30 +48,45 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
-# Берем версию с компа или удаленно
-def remote_or_local(remote_path, local_path):
-    filename = os.path.basename(remote_path)[:-5]
+# Берем версию с компа / удаленно / инишника
+def remote_or_local(remote_path, local_path, cfg_path, local):
+    filename = os.path.basename(local_path)[:-5]
+
+    if local is True:
+        print(f"# Info: {filename} file info: Local (INI)")
+        return local_path
+
     try:
-        if os.path.exists(remote_path):
-            print(f"# Info: {filename} file info: Remote")
-            return remote_path
-        else:
-            print(f"# Info: {filename} file info: Local")
-            return resource_path(local_path)
+        if cfg_path is not None:
+            if os.path.exists(cfg_path):
+                print(f"# Info: {filename} file info: INI")
+                return cfg_path
+
+        if remote_path is not None:
+            if os.path.exists(remote_path):
+                print(f"# Info: {filename} file info: Remote")
+                return remote_path
+
+        print(f"# Info: {filename} file info: Local")
+        return resource_path(local_path)
     except Exception as ex:
-        input(ex)
+        input(f"### ERROR: Remote or Local proc: {ex}")
 
 
-class df_DBF:
-    def __init__(self):
+class df_DBF():
+    def __init__(self, index_remote_path=None, struct_remote_path=None, index_path=None, struct_path=None, local=False):
 
         self.dbf_path = ''
         self.lng = 'RU'
 
-        self.index_filename = remote_or_local(remote_path=index_filename_remote_path,
-                                              local_path=index_filename_local_path)
-        self.struct_filename = remote_or_local(remote_path=struct_filename_remote_path,
-                                               local_path=struct_filename_local_path)
+        self.index_filename = remote_or_local(remote_path=index_remote_path,
+                                              local_path=index_filename_local_path,
+                                              cfg_path=index_path,
+                                              local=local)
+        self.struct_filename = remote_or_local(remote_path=struct_remote_path,
+                                               local_path=struct_filename_local_path,
+                                               cfg_path=struct_path,
+                                               local=local)
         # Списки из Экселя
         try:
             self.df_index_fea_code = pd.read_excel(self.index_filename, sheet_name='FEA_CODE')
@@ -257,8 +272,7 @@ class df_DBF:
 
         ts = time.time()
         self.load_dbf(dbf_path=dbf_path)
-        #print_time_spent(ts, time.time(), descr="'DBF Load'")
-
+        # print_time_spent(ts, time.time(), descr="'DBF Load'")
 
         if diameter < 100:
             diameter = diameter * 25.4
@@ -272,7 +286,7 @@ class df_DBF:
         self.df_replace(self.df_index_fea_type, '#LOC')
         self.df_replace(self.df_index_rep_method, '#REP_METHOD')
 
-        #print_time_spent(tsr, time.time(), descr="'REPLACE'")
+        # print_time_spent(tsr, time.time(), descr="'REPLACE'")
 
         ts = time.time()
 
