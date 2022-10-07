@@ -1,4 +1,5 @@
 import os.path
+
 import pandas as pd
 import numpy as np
 import sys
@@ -10,6 +11,8 @@ from other_functions import dbf_feature_type_combine
 from other_functions import dbf_description_combine
 from parse_templates import read_template
 import traceback
+import codecs
+import shutil
 
 import time
 
@@ -476,23 +479,31 @@ def export_default(dbf_path):
     basename = os.path.basename(path)
     exportpath = os.path.join(absbath, basename)
     exportpath_csv = f'{exportpath[:-4]}.csv'
+    exportpath_xlsx = f'{exportpath[:-4]}.xlsx'
     csv_encoding = "cp1251"
 
     try:
         to_csv_custom_header(df=exp1, csv_path=exportpath_csv, column_names=column_names, csv_encoding=csv_encoding)
+        change_1251_csv_encoding(exportpath_csv)
+        os.startfile(exportpath_csv)
+        # to_excel_custom_header(df=exp1, excel_path=exportpath_xlsx, column_names=column_names)
 
     except Exception as PermissionError:
         print(f"'{basename[:-4]}.csv' is opened, saved as '{basename[:-4]}_1.csv'")
         exportpath = os.path.join(absbath, basename)
         exportpath_csv = f'{exportpath[:-4]}_1.csv'
+        exportpath_xlsx = f'{exportpath[:-4]}_1.xlsx'
         to_csv_custom_header(df=exp1, csv_path=exportpath_csv, column_names=column_names, csv_encoding=csv_encoding)
+        change_1251_csv_encoding(exportpath_csv)
+        os.startfile(exportpath_csv)
+        # to_excel_custom_header(df=exp1, excel_path=exportpath_xlsx, column_names=column_names)
 
-    input("~~~ Export Successful ~~~")
+    print("~~~ Export Successful ~~~")
 
 
 # сохраняем в csv c custom столбцами
 def to_csv_custom_header(df, csv_path, column_names, csv_encoding):
-    print(f'# Columns saved: {len(column_names)}')
+    print(f'# Info (DF_DBF): Columns saved: {len(column_names)}')
     # print(f'# Custom headers info: Columns list: {column_names}')
 
     with open(csv_path, 'w') as csvfile:
@@ -502,11 +513,31 @@ def to_csv_custom_header(df, csv_path, column_names, csv_encoding):
         # column_names_string = ",".join([str(i) for i in column_names])
         csvfile.write(f'{column_names_string}\n')
 
-        # write = csv.writer(csvfile)
-        # write.writerow(column_names)
-        # csvfile.write('КонЭц\n')
-
     df.to_csv(csv_path, header=False, index=False, encoding=csv_encoding, mode="a")
+
+def change_1251_csv_encoding(file_path):
+    def encode_change(file_path, source_encoding, target_encoding):
+        tmp_file = file_path + '.tmp'
+        BLOCKSIZE = 1048576  # or some other, desired size in bytes
+        with codecs.open(file_path, "r", source_encoding) as sourceFile:
+            with codecs.open(tmp_file, "w", target_encoding) as targetFile:
+                while True:
+                    contents = sourceFile.read(BLOCKSIZE)
+                    if not contents:
+                        break
+                    targetFile.write(contents)
+        shutil.move(tmp_file, file_path)
+
+    encode_change(file_path, 'cp1251', 'utf-8')
+    encode_change(file_path, 'utf-8', 'utf-8-sig')
+
+# сохраняем в csv c custom столбцами
+def to_excel_custom_header(df, excel_path, column_names):
+    print(f'# Info DF_DBF: {len(column_names)}')
+
+    df.columns = column_names
+    with pd.ExcelWriter(excel_path) as writer:
+        df.to_excel(writer, index=False)
 
 
 def cross_columns_list(list_exist, list_target):
@@ -552,6 +583,6 @@ if __name__ == '__main__':
             export_default(path)
 
     if DEBUG != 1:
-        input("~~~ Done~~~")
+        input("")
     else:
         print("~~~ DEBUG Done ~~~")

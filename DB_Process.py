@@ -15,8 +15,12 @@ from parse_templates import *
 from play_sound import PlaySound
 from parse_cfg import CFG
 from TkinterDnD2 import *
+import DBtoKML
+from other_functions import cls_pyfiglet
 
 pd.options.mode.chained_assignment = None  # default='warn'
+
+DEBUG = 1
 
 
 class DB_FORM:
@@ -25,7 +29,9 @@ class DB_FORM:
 
         self.EXP_DAY = '2022-10-15'
         # 'fender' 'kban' 'larry3d'
-        print('\n' + pyfiglet.figlet_format("DB Process", justify='center', font='larry3d'))
+        # print('\n' + pyfiglet.figlet_format("DB Process", justify='center', font='larry3d'))
+        cls_pyfiglet('DB Process', 'larry3d')
+
         self.cfg = CFG('DB Process')
 
         # self.updater_name = 'DB Process'
@@ -35,7 +41,7 @@ class DB_FORM:
 
         self.lang_list = ["RU", "EN"]
         self.db_ext_list = ('dbf', 'DBF')
-
+        self.kml_line_width_lst = [1, 3, 5]
         self.db_path = ''
 
         # https://www.color-hex.com/popular-colors.php
@@ -97,8 +103,9 @@ class DB_FORM:
         self.db_process_form.drop_target_register(DND_FILES)
         self.db_process_form.dnd_bind('<<Drop>>', self.open_with_dnd)
 
-        self.menu = Menu(self.db_process_form)
-        self.db_process_form.config(menu=self.menu)
+        self.menu_main = Menu(self.db_process_form)
+
+        self.db_process_form.config(menu=self.menu_main)
 
         self.tabs_main = ttk.Notebook(self.db_process_form)
         self.tab1 = ttk.Frame(self.tabs_main)
@@ -110,23 +117,32 @@ class DB_FORM:
         self.tabs_main.add(self.tab3, text='KML')
         self.tabs_main.add(self.tab4, text='Other')
 
-        file_menu = Menu(self.menu, tearoff=0)
+        self.tabs_main.select(self.get_def_tab())
+
+        file_menu = Menu(self.menu_main, tearoff=0)
         file_menu.add_command(label="Open...", command=self.openfile)
-        file_menu.add_command(label="Export")
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.on_closing)
-        self.menu.add_cascade(label="File",
-                              menu=file_menu)
+        self.menu_main.add_cascade(label="File",
+                                   menu=file_menu)
 
         # groove, raised, ridge, solid, or sunken
         self.db_file_label = Label(self.db_process_form, text="-DB Name-", font=("Verdana", 12),
-                                   justify='center', foreground='red', relief='groove', padx=5, pady=5)
+                                   justify='center', foreground='red', relief='groove', padx=5, pady=3)
 
-        self.template_menu = Menu(self.menu, tearoff=0)
+        self.template_menu = Menu(self.menu_main, tearoff=0)
         self.templates_radio_variable = StringVar()
         self.update_menu_templates()
-        self.menu.add_cascade(label="Templates",
-                              menu=self.template_menu)
+        self.menu_main.add_cascade(label="Templates",
+                                   menu=self.template_menu)
+
+        others_menu = Menu(self.menu_main, tearoff=0)
+        others_menu.add_command(label="Open Config Folder", command=parse_templates.open_templates_folder)
+        others_menu.add_command(label="Save Tab Position",
+                                command=lambda: self.cfg.store_settings('GENERAL', 'default_tab',
+                                                                        self.tabs_main.index(
+                                                                            self.tabs_main.select()) + 1))
+        self.menu_main.add_cascade(label="Configs", menu=others_menu)
 
         self.columns_variable = StringVar(self.tab1)
         self.columns_textbox = Entry(self.tab1, textvariable=self.columns_variable)
@@ -134,10 +150,12 @@ class DB_FORM:
         self.clear_headers_button = Button(self.tab1, text="Clear", command=self.clear_headers)
 
         self.load_db_button = Button(self.db_process_form, text="Load DB", command=self.db_load)
-        self.export_db_button = Button(self.db_process_form, text="to CSV", width=10, command=self.db_export)
+        self.csv_export_button = Button(self.db_process_form, text="to CSV", width=10,
+                                        command=lambda: self.db_export(ext='csv'))
+        self.xlsx_export_button = Button(self.db_process_form, text="to XLSX", width=10,
+                                         command=lambda: self.db_export(ext='xlsx'))
         self.clipboard_db_button = Button(self.db_process_form, text="to Clip", width=10,
                                           command=lambda: self.db_export(to_clipboard=True))
-
 
         self.lang_list_variable = StringVar(self.db_process_form)
         self.lang_combobox = OptionMenu(self.db_process_form, self.lang_list_variable, *self.lang_list)
@@ -150,8 +168,14 @@ class DB_FORM:
         self.scroll_pane = ttk.Scrollbar(master=self.tab1, command=self.db_columns_listbox.yview)
         self.db_columns_listbox.configure(yscrollcommand=self.scroll_pane.set)
 
-        self.clear_process_list_button = Button(master=self.tab1, text="Clear", command=self.clear_process_listbox,
-                                                width=25)
+        image_up = PhotoImage(file='icons/arrrow_up.png')
+        image_dwn = PhotoImage(file='icons/arrrow_dwn.png')
+        self.process_lst_row_up_btn = Button(master=self.tab1, image=image_up,
+                                             command=self.custom_listbox_processed_row_up, width=22)
+        self.process_lst_row_dwn_btn = Button(master=self.tab1, image=image_dwn,
+                                              command=self.custom_listbox_processed_row_dwn, width=22)
+
+        self.clear_process_list_button = Button(master=self.tab1, text="Clear", command=self.clear_process_listbox)
         self.filter_variable = StringVar()
         self.filter_variable.trace("w", self.filter_total_columns_listbox)
         self.filter_total_columns_textbox = Entry(master=self.tab1, width=35,
@@ -159,16 +183,11 @@ class DB_FORM:
 
         self.diam_list_variable = StringVar(self.db_process_form)
         self.diam_combobox = OptionMenu(self.db_process_form, self.diam_list_variable, *self.inch_names_list)
+        self.diam_combobox.config(width=20)
 
-        self.template_name_label = Label(self.db_process_form, text="New Template Name")
-        self.template_name_variable = StringVar(self.db_process_form)
-        self.template_name_textbox = Entry(self.db_process_form, width=22, textvariable=self.template_name_variable)
-
-        self.save_template_button = Button(self.db_process_form, text="Save template", command=self.save_template)
-        self.rewrite_template_button = Button(self.db_process_form, text="Rewrite template",
-                                              command=self.rewrite_template)
-        self.open_templates_folder_button = Button(self.db_process_form, text="Open Templates Folder",
-                                                   command=parse_templates.open_templates_folder)
+        self.checks_cond_var = StringVar(self.db_process_form)
+        self.checks_cond_comb = OptionMenu(self.db_process_form, self.checks_cond_var, *('AND', 'OR'))
+        self.checks_cond_var.set('AND')
 
         # высота в строках
         self.stat_tree = CheckboxTreeview(self.db_process_form, show='tree', column="c1", height=20)
@@ -178,9 +197,9 @@ class DB_FORM:
         self.stat_tree_tags_variable.trace(mode='w', callback=self.stat_tree_tags_option_change)
         self.stat_tree_tags_combobox = OptionMenu(self.db_process_form, self.stat_tree_tags_variable,
                                                   self.stat_tree_tags_list)
-        self.sel_all_checks = Button(self.db_process_form, text="Select All", command=self.select_all_checks)
-        self.remove_all_checks = Button(self.db_process_form, text="Clear All", command=self.remove_all_checks)
-        self.invert_checks = Button(self.db_process_form, text="Invert", command=self.invert_checks)
+        self.sel_all_checks_btn = Button(self.db_process_form, text="Select All", command=self.select_all_checks)
+        self.remove_all_checks_btn = Button(self.db_process_form, text="Clear All", command=self.remove_all_checks)
+        self.invert_checks_btn = Button(self.db_process_form, text="Invert", command=self.invert_checks)
 
         self.doc_tree = CheckboxTreeview(self.db_process_form, show='tree', column="c1", height=5)
         self.doc_tree.column("# 0", anchor='center', stretch='YES', width=30)
@@ -194,6 +213,11 @@ class DB_FORM:
                                   relief=GROOVE)
         self.play_button_stop = Button(self.tab4, text="Stop", command=self.stop_sound,
                                        relief=GROOVE)
+
+        self.KML_btn = Button(self.tab3, text="DBF to KML", command=self.DB_to_KML)
+        self.KML_line_width_lbl = Label(self.tab3, text="Line Width")
+        self.KML_line_width_var = StringVar(self.tab3)
+        self.KML_line_width_comb = OptionMenu(self.tab3, self.KML_line_width_var, *self.kml_line_width_lst)
 
         style = ttk.Style(self.db_process_form)
         # remove the indicator in the treeview
@@ -225,6 +249,9 @@ class DB_FORM:
             if os.path.exists(arg):
                 print('Drag&Drop file: ', arg)
 
+        if DEBUG == 1:
+            arg = r'd:\OneDrive\Macro\PYTHON\bKML\Test\2nwfm.DBF'
+
         exp_date_formatted = datetime.strptime(self.EXP_DAY, "%Y-%m-%d").date()
         now_date = date.today()
         days_left = exp_date_formatted - now_date
@@ -235,14 +262,16 @@ class DB_FORM:
         if exp_date_formatted >= now_date:
 
             self.db_process_form.title("DB process")
-            self.db_process_form.geometry("1240x610")
-            self.db_process_form.minsize(1240, 600)
-            self.db_process_form.maxsize(1240, 650)
+            width = 1135
+            height = 590
+            self.db_process_form.geometry(f"{width}x{height}")
+            self.db_process_form.minsize(width, height)
+            self.db_process_form.maxsize(width, height)
 
-            self.lang_combobox.grid(row=0, column=0, columnspan=1)
+            self.lang_combobox.grid(row=1, column=0, columnspan=1)
             self.diam_combobox.grid(row=2, column=0, sticky=EW, columnspan=2)
 
-            self.db_file_label.grid(row=0, column=1, columnspan=1)
+            self.db_file_label.grid(row=0, column=0, columnspan=2)
 
             self.load_db_button.grid(row=1, column=1, sticky=EW, padx=2, columnspan=1)
 
@@ -254,39 +283,41 @@ class DB_FORM:
             self.stat_tree_tags_combobox.grid(row=1, column=9, padx=5, columnspan=3, sticky=EW)
             self.stat_tree_tags_combobox.grid(row=1, column=9, padx=5, columnspan=3, sticky=EW)
 
-            self.sel_all_checks.grid(row=0, column=9, sticky=E + W + S, padx=3)
-            self.remove_all_checks.grid(row=0, column=10, sticky=E + W + S, padx=3)
-            self.invert_checks.grid(row=0, column=11, sticky=E + W + S, padx=3)
+            self.sel_all_checks_btn.grid(row=0, column=9, sticky=EW, padx=3)
+            self.remove_all_checks_btn.grid(row=0, column=10, sticky=EW, padx=3)
+            self.invert_checks_btn.grid(row=0, column=11, sticky=EW, padx=3)
 
-            self.template_name_label.grid(row=10, column=0, columnspan=2, sticky=EW)
-            self.template_name_textbox.grid(row=11, column=0, columnspan=2, padx=3, sticky=EW)
-            self.open_templates_folder_button.grid(row=16, column=0, columnspan=2, sticky=EW)
-
-            self.save_template_button.grid(row=12, column=0, padx=3, sticky=EW, columnspan=2)
-            self.rewrite_template_button.grid(row=13, column=0, padx=3, sticky=EW, columnspan=2)
+            self.checks_cond_comb.grid(row=1, column=12, sticky=EW, padx=3)
 
             self.clipboard_db_button.grid(row=15, column=12, sticky=EW)
-            self.export_db_button.grid(row=17, column=12, sticky=EW)
+            self.csv_export_button.grid(row=17, column=12, sticky=EW)
+            self.xlsx_export_button.grid(row=18, column=12, sticky=EW)
 
             # TABS
             self.tabs_main.grid(row=0, column=14, columnspan=1, rowspan=40)
             # TAB 1
 
-            self.columns_textbox.grid(row=0, column=1, columnspan=1, sticky=EW)
             self.clear_headers_button.grid(row=0, column=0, sticky=EW, padx=2, columnspan=1)
+            self.columns_textbox.grid(row=0, column=1, columnspan=1, sticky=EW)
 
             self.custom_listbox_raw.grid(row=1, column=0, rowspan=40, columnspan=2, padx=3, sticky=E)
-            self.custom_listbox_processed.grid(row=1, column=3, rowspan=40, columnspan=2)
-            self.db_columns_listbox.grid(row=1, column=5, rowspan=40, columnspan=2)
-            self.scroll_pane.grid(row=1, column=7, rowspan=40, columnspan=1, sticky=NS)
-            self.clear_process_list_button.grid(row=0, column=3, columnspan=2)
-            self.filter_total_columns_textbox.grid(row=0, column=5, columnspan=2)
+            self.custom_listbox_processed.grid(row=1, column=3, rowspan=40, columnspan=6)
+            self.db_columns_listbox.grid(row=1, column=9, rowspan=40, columnspan=3)
+
+            self.clear_process_list_button.grid(row=0, column=6, columnspan=3, sticky=EW)
+            self.process_lst_row_up_btn.grid(row=0, column=3, columnspan=1, sticky=EW, padx=1)
+            self.process_lst_row_dwn_btn.grid(row=0, column=4, columnspan=1, sticky=EW, padx=1)
+
+            self.filter_total_columns_textbox.grid(row=0, column=9, columnspan=2, padx=2)
+            self.scroll_pane.grid(row=1, column=12, rowspan=40, columnspan=1, sticky=NS)
+            # TAB 3
+            self.KML_btn.grid(row=0, column=0, columnspan=1)
+            self.KML_line_width_lbl.grid(row=0, column=1, columnspan=1)
+            self.KML_line_width_comb.grid(row=0, column=2, columnspan=1)
             # TAB 4
             self.play_button.grid(row=0, column=0, columnspan=1)
             self.play_button_stop.grid(row=0, column=1, columnspan=1)
             # ----------------
-
-
 
             # self.db_columns_listbox.insert(1, "Data Structure")
             # self.db_columns_listbox.insert(2, "Algorithm")
@@ -323,6 +354,12 @@ class DB_FORM:
             self.custom_listbox_processed.bind('<Double-Button>', self.custom_listbox_processed_delete)
 
             self.lang_list_variable.set(self.lang_list[0])
+
+            cfg_line_width = self.cfg.read_cfg(section="KML", key='line_width')
+            if cfg_line_width not in self.kml_line_width_lst:
+                self.KML_line_width_var.set(3)
+            else:
+                self.KML_line_width_var.set(cfg_line_width)
 
             if arg != '' and os.path.exists(arg):
                 # пишем аргумент в строку пути
@@ -366,6 +403,17 @@ class DB_FORM:
 
         self.db_process_form.mainloop()
 
+    def get_def_tab(self):
+        def_tab = self.cfg.read_cfg(section="GENERAL", key='default_tab', create_if_none=True, default=1)
+
+        if def_tab is None:
+            return 0
+
+        if def_tab in (1, 2, 3, 4):
+            return def_tab - 1
+
+        self.cfg.store_settings(section="GENERAL", key='default_tab', value=1)
+
     def updater_run(self, exe_name):
         args = self.updater_name
         filename = 'B_Updater.exe'
@@ -380,12 +428,18 @@ class DB_FORM:
         self.cfg.store_settings(section="SOUND", key="enable", value=False)
 
     def save_template(self):
-        template_name = self.template_name_variable.get()
+        template_name = self.columns_textbox.get()
+        if len(template_name) > 30:
+            messagebox.showwarning(f'Save template Warning',
+                                   "Template name is too long (max 30 symbols)...",
+                                   icon='info')
+            return None
+
         columns_list = self.process_columns_df['COL_NAME'].tolist()
 
         if len(columns_list) != 0 and len(template_name) != 0:
             save_template(template_name=template_name, columns_list=columns_list)
-            self.template_name_textbox.delete(0, "end")
+            self.columns_textbox.delete(0, "end")
         else:
             messagebox.showwarning(f'Save template Warning',
                                    "Template name or Columns list is empty...",
@@ -438,18 +492,52 @@ class DB_FORM:
             self.template_menu.add_radiobutton(label=template, var=self.templates_radio_variable,
                                                command=self.load_template)
         self.template_menu.add_separator()
-        self.template_menu.add_command(label="Del Template", command=self.delete_template)
+        self.template_menu.add_command(label="Save Template", command=self.save_template)
+        self.template_menu.add_command(label="Delete Template", command=self.delete_template)
 
     # def update_option_menu(self):
     #     """
     #     Рефреш Компобокса
     #     """
     #     self.templates_list = get_templates_list()
-    #     templates_combobox = self.templates_combobox["menu"]
+    #     templates_combobox = self.templates_combobox["menu_main"]
     #     templates_combobox.delete(0, "end")
     #     for string in self.templates_list:
     #         templates_combobox.add_command(label=string,
     #                                        command=lambda value=string: self.templates_variable.set(value))
+
+    def clear_process_listbox(self):
+        self.process_columns_df = self.process_columns_df.iloc[0:0]
+        self.custom_listbox_processed.delete(0, 'end')
+        self.custom_listbox_raw.delete(0, 'end')
+
+    def filter_total_columns_listbox(self, *args):
+
+        filter_text = self.filter_variable.get()
+
+        if filter_text == '':
+            self.total_columns_df = self.total_columns_filter_backup_df
+            total_columns_list = self.total_columns_filter_backup_df['COL_NAME'].tolist()
+            self.db_columns_listbox.delete(0, END)
+            for i in range(len(total_columns_list)):
+                item = total_columns_list[i]
+                self.db_columns_listbox.insert(END, item)
+        else:
+            filter_index_list = []
+
+            total_columns_list = self.total_columns_filter_backup_df['COL_NAME'].tolist()
+            total_columns_index_list = self.total_columns_filter_backup_df.index.tolist()
+
+            self.db_columns_listbox.delete(0, END)
+
+            for i in range(len(total_columns_list)):
+                item = total_columns_list[i]
+                if filter_text.lower() in item.lower():
+                    self.db_columns_listbox.insert(END, item)
+                    filter_index_list.append(total_columns_index_list[i])
+
+            self.total_columns_df = self.total_columns_filter_backup_df[
+                self.total_columns_filter_backup_df.index.isin(filter_index_list)]
 
     def custom_listbox_processed_add(self, event):
 
@@ -487,41 +575,9 @@ class DB_FORM:
                 # Старя реализация - Append удаляется из Pandas
                 # self.process_columns_df = self.process_columns_df.append({'COL_INDEX': col_index, 'COL_NAME': col_name},
                 #                                                          ignore_index=True)
+            self.custom_listbox_processed_mark_red()
 
-    def clear_process_listbox(self):
-        self.process_columns_df = self.process_columns_df.iloc[0:0]
-        self.custom_listbox_processed.delete(0, 'end')
-        self.custom_listbox_raw.delete(0, 'end')
-
-    def filter_total_columns_listbox(self, *args):
-
-        filter_text = self.filter_variable.get()
-
-        if filter_text == '':
-            self.total_columns_df = self.total_columns_filter_backup_df
-            total_columns_list = self.total_columns_filter_backup_df['COL_NAME'].tolist()
-            self.db_columns_listbox.delete(0, END)
-            for i in range(len(total_columns_list)):
-                item = total_columns_list[i]
-                self.db_columns_listbox.insert(END, item)
-        else:
-            filter_index_list = []
-
-            total_columns_list = self.total_columns_filter_backup_df['COL_NAME'].tolist()
-            total_columns_index_list = self.total_columns_filter_backup_df.index.tolist()
-
-            self.db_columns_listbox.delete(0, END)
-
-            for i in range(len(total_columns_list)):
-                item = total_columns_list[i]
-                if filter_text.lower() in item.lower():
-                    self.db_columns_listbox.insert(END, item)
-                    filter_index_list.append(total_columns_index_list[i])
-
-            self.total_columns_df = self.total_columns_filter_backup_df[
-                self.total_columns_filter_backup_df.index.isin(filter_index_list)]
-
-    def custom_listbox_processed_delete(self, even):
+    def custom_listbox_processed_delete(self, event):
         if self.custom_listbox_processed.curselection() != ():
             selection_id = self.custom_listbox_processed.curselection()[0]
             self.custom_listbox_processed.delete(selection_id)
@@ -532,8 +588,9 @@ class DB_FORM:
             # перенумеровываем индексы
             self.process_columns_df = self.process_columns_df.reset_index(drop=True)
 
-    def custom_listbox_processed_replace(self, even):
+            self.custom_listbox_processed_mark_red()
 
+    def custom_listbox_processed_replace(self, event):
         if self.db_columns_listbox.curselection() != ():
             db_columns_selection_id = self.db_columns_listbox.curselection()[0]
             db_columns_selected_item = self.db_columns_listbox.get(db_columns_selection_id)
@@ -548,6 +605,95 @@ class DB_FORM:
                 self.custom_listbox_processed.selection_set(custom_listbox_selection_id)
 
                 self.process_columns_df.loc[custom_listbox_selection_id] = [col_index, col_name]
+
+            self.custom_listbox_processed_mark_red()
+
+    def custom_listbox_processed_row_up(self):
+        # Если не пустой список под Экспорт
+        if self.custom_listbox_processed.curselection() != ():
+            # текущий выбранный индекс
+            selection_id = self.custom_listbox_processed.curselection()[0]
+            # имя текущего
+            tmp_val = self.custom_listbox_processed.get(selection_id)
+
+            # пока индекс большу нуля (чтоб не вылететь за out of bounds)
+            if selection_id > 0:
+                # удаляем текущую строчку
+                self.custom_listbox_processed.delete(selection_id)
+                # вставляем на 1ну выше
+                self.custom_listbox_processed.insert(selection_id - 1, tmp_val)
+                # выделяем на 1ну выше
+                self.custom_listbox_processed.selection_set(selection_id - 1)
+
+                # свопаем датафрэйм значений
+                b, c = self.process_columns_df.iloc[selection_id].copy(), self.process_columns_df.iloc[
+                    selection_id - 1].copy()
+                self.process_columns_df.iloc[selection_id], self.process_columns_df.iloc[selection_id - 1] = c, b
+
+                # ресетим индекс
+                self.process_columns_df = self.process_columns_df.reset_index(drop=True)
+
+                self.custom_listbox_processed_mark_red()
+
+    def custom_listbox_processed_row_dwn(self):
+        if self.custom_listbox_processed.curselection() != ():
+            selection_id = self.custom_listbox_processed.curselection()[0]
+            tmp_val = self.custom_listbox_processed.get(selection_id)
+
+            if selection_id < len(self.process_columns_df) - 1:
+                self.custom_listbox_processed.delete(selection_id)
+                self.custom_listbox_processed.insert(selection_id + 1, tmp_val)
+                self.custom_listbox_processed.selection_set(selection_id + 1)
+
+                b, c = self.process_columns_df.iloc[selection_id].copy(), self.process_columns_df.iloc[
+                    selection_id + 1].copy()
+                self.process_columns_df.iloc[selection_id], self.process_columns_df.iloc[selection_id + 1] = c, b
+
+                self.process_columns_df = self.process_columns_df.reset_index(drop=True)
+                self.custom_listbox_processed_mark_red()
+
+    def custom_listbox_processed_mark_red(self):
+        for i in range(len(self.process_columns_df)):
+            list_val = self.custom_listbox_processed.get(i)
+            self.custom_listbox_processed.itemconfig(i,
+                                                     bg="#ff7373" if list_val == '#BLANK' or list_val == "#NOT_IN_DB" else "white")
+
+    def DB_to_KML(self):
+
+        if self.db_file_label['text'] == "-DB Name-":
+            messagebox.showwarning(f'KML Export Info', "Nothing to export to KML \U0001F625",
+                                   icon='info')
+            return None
+        try:
+
+            df_for_kml = self.get_checked_df()
+            if df_for_kml is None:
+                messagebox.showwarning(f'KML Export Info', "Nothing to export to KML \U0001F625",
+                                       icon='info')
+                return None
+
+            line_width = self.KML_line_width_var.get()
+            kml_class = DBtoKML.bKML()
+            kml_path = kml_class.dbf_to_kml(line_width=line_width, df=df_for_kml, df_dbf_class=self.df_dbf_class,
+                                            export_path=self.db_path)
+
+            self.ask_open_file(kml_path)
+
+        except TypeError and AttributeError:
+
+            # messagebox.showwarning(f'Error', "DB not Loaded",
+            #                        icon='error')
+            print('# ERROR: DB not Loaded!')
+
+    @staticmethod
+    def ask_open_file(file_path):
+        if os.path.exists(file_path):
+            f_name = os.path.basename(file_path)
+            open_kml = messagebox.askquestion(
+                'Open file?', f'File <{f_name}> is created.\n\t'
+                              f'Open file?', icon='info')
+            if open_kml == 'yes':
+                os.startfile(file_path)
 
     def add_tree(self):
         # добавляем тестовые записи в Статы
@@ -630,14 +776,15 @@ class DB_FORM:
 
     def remove_all_checks(self):
 
-        stat_tree = self.stat_tree
-        # Список ID
-        tree_items = stat_tree.get_children()
         self.stat_tree_tags_variable.set('')
 
-        for tree_id in tree_items:
-            self.stat_tree._uncheck_descendant(tree_id)
-            self.stat_tree._uncheck_ancestor(tree_id)
+        trees = (self.stat_tree, self.doc_tree, self.marker_tree)
+
+        for tree in trees:
+            doc_items = tree.get_children()
+            for doc_id in doc_items:
+                tree._uncheck_descendant(doc_id)
+                tree._uncheck_ancestor(doc_id)
 
     def invert_checks(self):
 
@@ -656,6 +803,7 @@ class DB_FORM:
                 self.stat_tree._check_descendant(tree_id)
 
     def on_closing(self):
+        self.cfg.store_settings(section="KML", key='line_width', value=self.KML_line_width_var.get())
         self.db_process_form.destroy()
         sys.exit()
 
@@ -875,6 +1023,7 @@ class DB_FORM:
     # грузим базу
     def db_load(self):
 
+        cls_pyfiglet('DB Process', 'larry3d')
         self.lng = str(self.lang_list_variable.get())
         diam_list_value = self.diam_list_variable.get()
         diameter = self.inch_dict[diam_list_value]
@@ -959,7 +1108,7 @@ class DB_FORM:
 
                 try:
                     pass
-                    # self.write_log(file_path=db_path)
+                    # self.write_log(export_path=db_path)
                 except Exception as logex:
                     print("LOG Error")
 
@@ -1021,102 +1170,157 @@ class DB_FORM:
             base_path = os.path.abspath(".")
         return os.path.join(base_path, relative_path)
 
-    def db_export(self, to_clipboard=False):
+    def get_checked_df(self):
 
-        if self.db_path != '':
+        """
+        Возвращаем DF чекнутых фич
+        :return: None если пусто
+        """
 
-            # !!! ВРЕМЕННО фильтрация работает для каждого поля независимо
+        # DF для перефильтровки и на экспорт
+        checked_df = None
 
-            # проверяем на наличие кликнутых в дереве статистики
-            checked_items_fea = []
-            for item in self.stat_tree.get_checked():
-                checked_items_fea.append(self.stat_tree.item(item, "text"))
-            # если список не пустой, фильтруем чекнутые
-            if len(checked_items_fea) != 0:
-                self.db_df_from_tree = self.db_df[self.db_df['#FEATURE'].isin(checked_items_fea)]
+        AND_OR = self.checks_cond_var.get()
 
-            # проверяем на наличие кликнутых в дереве документированных
-            checked_items_doc = []
-            for item in self.doc_tree.get_checked():
-                checked_items_doc.append(self.doc_tree.item(item, "text"))
-            if len(checked_items_doc) != 0:
-                self.db_df_from_tree = self.db_df[self.db_df['#DOC'].isin(checked_items_doc)]
+        # заполняем чекнутые
+        checked_items_fea = []
+        checked_items_doc = []
+        checked_items_marker = []
+        for item in self.stat_tree.get_checked():
+            checked_items_fea.append(self.stat_tree.item(item, "text"))
+        for item in self.doc_tree.get_checked():
+            checked_items_doc.append(self.doc_tree.item(item, "text"))
+        for item in self.marker_tree.get_checked():
+            checked_items_marker.append(self.marker_tree.item(item, "text"))
 
-            # проверяем на наличие кликнутых в дереве маркеров
-            checked_items_marker = []
-            for item in self.marker_tree.get_checked():
-                checked_items_marker.append(self.marker_tree.item(item, "text"))
-            if len(checked_items_marker) != 0:
-                self.db_df_from_tree = self.db_df[self.db_df['#REF'].isin(checked_items_marker)]
+        # фильтруем по очереди по каждому из чекнутых
+        if len(checked_items_fea) != 0:
+            checked_df = self.db_df[self.db_df['#FEATURE'].isin(checked_items_fea)]
 
-            if checked_items_fea == [] and checked_items_doc == [] and checked_items_marker == []:
-                df_for_export = self.db_df
+        if len(checked_items_doc) != 0:
+            if checked_df is None:
+                checked_df = self.db_df[self.db_df['#DOC'].isin(checked_items_doc)]
+            # AND
+            elif AND_OR == "AND":
+                checked_df = checked_df[checked_df['#DOC'].isin(checked_items_doc)]
+            # OR
             else:
-                df_for_export = self.db_df_from_tree
+                or_df = self.db_df[self.db_df['#DOC'].isin(checked_items_doc)]
+                if len(or_df) != 0:
+                    checked_df = pd.concat([checked_df, or_df])
 
-            # если есть кастом, то экспортим его, в противном случае - шаблон
+        if len(checked_items_marker) != 0:
+            if checked_df is None:
+                checked_df = self.db_df[self.db_df['#REF'].isin(checked_items_marker)]
+            # AND
+            elif AND_OR == "AND":
+                checked_df = checked_df[checked_df['#REF'].isin(checked_items_marker)]
+            # OR
+            else:
+                or_df = self.db_df[self.db_df['#REF'].isin(checked_items_marker)]
+                if len(or_df) != 0:
+                    checked_df = pd.concat([checked_df, or_df])
 
-            export_columns_list_index = self.process_columns_df['COL_INDEX'].tolist()
-            export_columns_list_names = self.process_columns_df['COL_INDEX'].tolist()
+        # если не нашли чекнутых - возвращаем целый DF
+        if checked_df is None:
+            checked_df = self.db_df
 
-            if len(export_columns_list_index) != 0:
-                exp1 = df_for_export[export_columns_list_index]
-                column_names = export_columns_list_names
-                columns_count_val_sort(export_columns_list_index)
+        # если перефильтровали пусто - возращаем None
+        if len(checked_df) == 0:
+            return None
 
-                # with open(file_path, 'w') as f:
-                #    f.write('Custom String\n')
+        return checked_df
 
-                # df.to_csv(file_path, header=False, mode="a")
-                # print (cross_columns)
+    def db_export(self, to_clipboard=False, ext='csv'):
 
-                if to_clipboard:
+        allow_ext = ('csv', 'xlsx')
+        if ext not in allow_ext:
+            ext = 'csv'
 
-                    # messagebox.showwarning(f'Clipboard Export', "Copied to the clipboard.",
-                    #                        icon='info')
-                    exp1.to_clipboard(sep='\t', index=False)
-                    # exp1.to_clipboard(index=False)
+        if self.db_path == '':
+            print('# Info: Export table is empty')
+            return None
+
+        df_for_export = self.get_checked_df()
+
+        if df_for_export is None:
+            messagebox.showwarning(f'Export Info', "Nothing to export \U0001F625",
+                                   icon='info')
+            return None
+
+        # если есть кастом, то экспортим его, в противном случае - шаблон
+        export_columns_list_index = self.process_columns_df['COL_INDEX'].tolist()
+        export_columns_list_names = self.process_columns_df['COL_NAME'].tolist()
+
+        if len(export_columns_list_index) != 0:
+            export_df = df_for_export[export_columns_list_index]
+            column_names = export_columns_list_names
+            columns_count_val_sort(export_columns_list_index)
+
+            # with open(export_path, 'w') as f:
+            #    f.write('Custom String\n')
+
+            # df.to_csv(export_path, header=False, mode="a")
+            # print (cross_columns)
+
+            if to_clipboard:
+
+                # messagebox.showwarning(f'Clipboard Export', "Copied to the clipboard.",
+                #                        icon='info')
+                export_df.columns = column_names
+                export_df.to_clipboard(sep='\t', index=False)
+                print(f'# Info: Rows in clipboard: {len(export_df)}')
+                # export_df.to_clipboard(index=False)
+            else:
+                absbath = os.path.dirname(self.db_path)
+                basename = os.path.basename(self.db_path)
+                exportpath = os.path.join(absbath, basename)
+                exportpath_csv = f'{exportpath[:-4]}.csv'
+                exportpath_xlsx = f'{exportpath[:-4]}.xlsx'
+
+                if self.lng == "RU":
+                    csv_encoding = "cp1251"
                 else:
-                    absbath = os.path.dirname(path)
-                    basename = os.path.basename(path)
-                    exportpath = os.path.join(absbath, basename)
-                    exportpath_csv = f'{exportpath[:-4]}.csv'
-                    exportpath_xlsx = f'{exportpath[:-4]}.xlsx'
-
-                    if self.lng == "RU":
-                        csv_encoding = "cp1251"
-                    else:
-                        csv_encoding = "utf-8"
-                    try:
-                        self.columns_textbox.delete(0, END)
-                        self.columns_textbox.insert(0, '')
-                        to_csv_custom_header(df=exp1, csv_path=exportpath_csv, column_names=column_names,
+                    csv_encoding = "utf-8"
+                try:
+                    self.columns_textbox.delete(0, END)
+                    self.columns_textbox.insert(0, '')
+                    if ext == 'csv' and self.lng != "SP":
+                        to_csv_custom_header(df=export_df, csv_path=exportpath_csv, column_names=column_names,
                                              csv_encoding=csv_encoding)
-                        messagebox.showwarning('CSV Export', f"Data saved to the <{basename[:-4]}.csv> file.",
-                                               icon='info')
-                        # exp1.to_csv(exportpath_csv, encoding=csv_encoding, index=False)
-                        # xw.Book(exportpath_csv)
-                        # xw.view(exportpath_csv, table=False)
-                        if self.lng == "SP":
-                            exp1.to_excel(exportpath_xlsx, encoding=csv_encoding, index=False)
+                        change_1251_csv_encoding(exportpath_csv)
+                        self.ask_open_file(exportpath_csv)
+                    if ext == 'xlsx' or self.lng == "SP":
+                        to_excel_custom_header(df=export_df, excel_path=exportpath_xlsx, column_names=column_names)
+                        self.ask_open_file(exportpath_xlsx)
 
-                    except Exception as PermissionError:
-                        self.columns_textbox.delete(0, END)
-                        self.columns_textbox.insert(0, '')
+                except Exception == PermissionError:
+                    self.columns_textbox.delete(0, END)
+                    self.columns_textbox.insert(0, '')
+
+                    if ext == 'csv' and self.lng != "SP":
                         print(f"'{basename[:-4]}.csv' is opened, saved as '{basename[:-4]}_1.csv'")
                         exportpath = os.path.join(absbath, basename)
                         exportpath_csv = f'{exportpath[:-4]}_1.csv'
-                        exportpath_xlsx = f'{exportpath[:-4]}_1.xlsx'
-                        to_csv_custom_header(df=exp1, csv_path=exportpath_csv, column_names=column_names,
+                        to_csv_custom_header(df=export_df, csv_path=exportpath_csv, column_names=column_names,
                                              csv_encoding=csv_encoding)
-                        # exp1.to_csv(exportpath_csv, encoding=csv_encoding, index=False)
-                        if self.lng == "SP":
-                            exp1.to_excel(exportpath_xlsx, encoding=csv_encoding, index=False)
-            else:
+                        change_1251_csv_encoding(exportpath_csv)
+                        self.ask_open_file(exportpath_csv)
+                    if ext == 'xlsx' or self.lng != "SP":
+                        print(f"'{basename[:-4]}.xlsx' is opened, saved as '{basename[:-4]}_1.xlsx'")
+                        exportpath = os.path.join(absbath, basename)
+                        exportpath_xlsx = f'{exportpath[:-4]}_1.xlsx'
+                        to_excel_custom_header(df=export_df, excel_path=exportpath_xlsx, column_names=column_names)
+                        self.ask_open_file(exportpath_xlsx)
 
-                messagebox.showwarning(f'Export Error', "Columns for Export not selected...",
-                                       icon='warning')
-                print('# Info: Export table is empty')
+                print(f'# Info: Rows Exported: {len(export_df)}')
+
+                # if self.lng == "SP":
+                #     export_df.columns = column_names
+                #     export_df.to_excel(exportpath_xlsx, encoding=csv_encoding, index=False)
+        else:
+            messagebox.showwarning(f'Export Error', "Columns for Export not selected...",
+                                   icon='warning')
 
 
 if __name__ == "__main__":
@@ -1129,7 +1333,7 @@ if __name__ == "__main__":
 
         if run_atr == "-D":
             export_default(dbf_path=path)
-            input("~~~ Done~~~")
+            input("")
         else:
             input("### Error: Wrong Attribute")
 

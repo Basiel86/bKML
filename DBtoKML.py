@@ -2,7 +2,6 @@ import simplekml
 import DF_DBF
 import os
 import traceback
-from parse_cfg import CFG
 
 ml_range_colors = {'0-10': [99, 190, 123],
                    '10-20': [138, 201, 125],
@@ -38,13 +37,9 @@ def get_pname_lname(lang="EN"):
 
 
 class bKML:
-    def __init__(self, dbf_path, diameter, lang="RU"):
+    def __init__(self):
 
-        self.cfg = CFG('DBF to KML')
-        self.dbf_path = dbf_path
-        self.lang = lang
-        self.diameter = diameter
-        self.features_types_list = ['ANOM', 'CONSTRUCT', 'OTHER']
+        self.lang = 'RU'
         self.kml = simplekml.Kml()
         self.kml_anomalies_folder = simplekml.Folder
         self.kml_constructions_folder = simplekml.Folder
@@ -63,7 +58,7 @@ class bKML:
 
         # self.ml_icon_path = self.kml.addfile(r'icons\ML.png')
 
-    def kml_make_anomalies_folder(self):
+    def __kml_make_anomalies_folder(self):
 
         if self.is_anomalies_folder_exists is False:
             self.is_anomalies_folder_exists = True
@@ -74,7 +69,7 @@ class bKML:
 
             self.kml_anomalies_folder = self.kml.newfolder(name=fname)
 
-    def kml_make_ml_folder(self, ml_type=None):
+    def __kml_make_ml_folder(self, ml_type=None):
 
         if self.is_ml_folder_exist is False:
             self.is_ml_folder_exist = True
@@ -92,7 +87,7 @@ class bKML:
             if self.is_ext_ml_folder_exists is False:
                 self.ml_ext_folder = self.ml_folder.newfolder(name=ml_type)
 
-    def kml_make_constructions_folder(self):
+    def __kml_make_constructions_folder(self):
 
         if self.is_constructions_folder_exists is False:
             self.is_constructions_folder_exists = True
@@ -103,7 +98,7 @@ class bKML:
 
             self.kml_constructions_folder = self.kml.newfolder(name=fname)
 
-    def kml_make_others_folder(self):
+    def __kml_make_others_folder(self):
 
         if self.is_others_folder_exists is False:
             self.is_others_folder_exists = True
@@ -115,13 +110,13 @@ class bKML:
 
             self.kml_others_folder = self.kml.newfolder(name=fname)
 
-    def kml_save(self, kml_name):
+    def __kml_save(self, kml_name):
         # self.kml.save(f"{kml_name}.kml")
         self.kml.savekmz(f"{kml_name}.kmz")
 
-    def kml_write_anomaly(self, feature_name, kml_data, isvisible=None, add_points_folder=False):
+    def __kml_write_anomaly(self, feature_name, kml_data, isvisible=None, add_points_folder=False):
 
-        self.kml_make_anomalies_folder()
+        self.__kml_make_anomalies_folder()
 
         if isvisible is None:
             isvisible = [1, 0]
@@ -152,11 +147,11 @@ class bKML:
         # line.style.linestyle.color = simplekml.Color.red  # Red
         # line.style.linestyle.width = 3  # 3 pixels
 
-    def kml_write_ml_subranges(self, kml_data, isvisible=None, add_points_folder=False):
+    def __kml_write_ml_subranges(self, kml_data, isvisible=None, add_points_folder=False):
 
         max_group_count = 5000
 
-        self.kml_make_anomalies_folder()
+        self.__kml_make_anomalies_folder()
 
         pname, lname = get_pname_lname(self.lang)
 
@@ -181,7 +176,7 @@ class bKML:
                 current_ml_type_df = kml_data.loc[kml_data['#LOC'] == current_ml_type].copy(deep=True)
 
                 # создаем папку с ПМ и типом
-                self.kml_make_ml_folder(ml_type=current_ml_type)
+                self.__kml_make_ml_folder(ml_type=current_ml_type)
 
                 # создаем временную папку отвечающую за тип потери
                 if current_ml_type in int_list:
@@ -219,9 +214,8 @@ class bKML:
                                 feature_line.append(
                                     (current_range_df.iloc[elem_id, 2], current_range_df.iloc[elem_id, 1]))
                                 point = tmp_points_folder.newpoint(name=current_range_df.iloc[elem_id, 0],
-                                                                    coords=current_coord,
-                                                                    visibility=point_visibility)
-
+                                                                   coords=current_coord,
+                                                                   visibility=point_visibility)
 
                                 point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes' \
                                                                   '/placemark_circle.png '
@@ -232,9 +226,9 @@ class bKML:
                                 # point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/placemark_square.png'
                                 point.style.labelstyle.scale = 0.9
 
-    def kml_write_construction(self, feature_name, kml_data, isvisible=None, add_points_folder=False):
+    def __kml_write_construction(self, feature_name, kml_data, isvisible=None, add_points_folder=False):
 
-        self.kml_make_constructions_folder()
+        self.__kml_make_constructions_folder()
 
         if isvisible is None:
             isvisible = [1, 0]
@@ -267,9 +261,9 @@ class bKML:
         # line.style.linestyle.color = simplekml.Color.red  # Red
         # line.style.linestyle.width = 3  # 3 pixels
 
-    def kml_write_others(self, feature_name, kml_data, isvisible=None, add_points_folder=False):
+    def __kml_write_others(self, feature_name, kml_data, isvisible=None, add_points_folder=False):
 
-        self.kml_make_others_folder()
+        self.__kml_make_others_folder()
 
         if isvisible is None:
             isvisible = [1, 0]
@@ -301,7 +295,7 @@ class bKML:
         # line.style.linestyle.color = simplekml.Color.red  # Red
         # line.style.linestyle.width = 3  # 3 pixels
 
-    def kml_write_top_lvl(self, feature_name, kml_data, isvisible=None, points_folder=False):
+    def __kml_write_top_lvl(self, feature_name, kml_data, isvisible=None, points_folder=False):
 
         if isvisible is None:
             isvisible = [1, 0]
@@ -336,7 +330,7 @@ class bKML:
             # точки с GPS TMP не пишем
             if 'отвод' not in point_descr:
                 point = tmp_points_folder.newpoint(name=point_descr, coords=current_coord,
-                                               visibility=point_visibility)
+                                                   visibility=point_visibility)
                 if feature_name in ['Маркер', 'Marker']:
                     point.style.iconstyle.icon.href = 'http://maps.google.com/mapfiles/kml/shapes/flag.png'
                 else:
@@ -351,27 +345,36 @@ class bKML:
             line.style.linestyle.color = simplekml.Color.rgb(217, 0, 0)
             line.style.linestyle.width = self.line_width  # 3 pixels
 
-    def dbf_to_kml(self, line_width):
+    @staticmethod
+    def dbf_load(dbf_path, diameter, lang="RU") -> tuple:
+
+        """
+        Конвертим DBF в DF
+        :return: список (Класс DF_DBF, DF, dbf_path)
+        """
+
+        dbf_conf_init = DF_DBF.df_DBF(local=True)
+        cls = dbf_conf_init
+        df = dbf_conf_init.convert_dbf(diameter=diameter, dbf_path=dbf_path, lang=lang)
+        return cls, df, dbf_path
+
+    def dbf_to_kml(self, line_width, df_dbf_class, df, export_path):
+
+        """
+        конвертируем Датафрейм в KML
+        :param line_width:
+        :param df_dbf_class:
+        :param df:
+        :param export_path:
+        """
 
         self.line_width = line_width
 
-        index_cfg_path = self.cfg.read_cfg(section="PATHS", key="index_custom", create_if_none=True)
-        struct_cfg_path = self.cfg.read_cfg(section="PATHS", key="struct_custom", create_if_none=True)
-        index_remote_path = self.cfg.read_cfg(section="PATHS", key="index_share", create_if_none=True,
-                                              default=r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\DBF_INDEX.xlsx')
-        struct_remote_path = self.cfg.read_cfg(section="PATHS", key="struct_share", create_if_none=True,
-                                               default=r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\STRUCT.xlsx')
-        local = self.cfg.read_cfg(section="PATHS", key="local", create_if_none=True, default=False)
-
-        dbf_conf_init = DF_DBF.df_DBF(index_remote_path=index_remote_path,
-                                   index_path=index_cfg_path,
-                                   struct_remote_path=struct_remote_path,
-                                   struct_path=struct_cfg_path,
-                                   local=local)
-        df_DBF_raw = dbf_conf_init.convert_dbf(diameter=self.diameter, dbf_path=self.dbf_path, lang=self.lang)
+        df_DBF_raw = df
+        dbf_conf_init = df_dbf_class
 
         # не берем в расчет отремонтированные
-        df_DBF_raw = df_DBF_raw[df_DBF_raw['#DOC'] != 'T']
+        # df_DBF_raw = df_DBF_raw[df_DBF_raw['#DOC'] != 'T']
 
         meter = meter_lang[self.lang]
 
@@ -379,6 +382,13 @@ class bKML:
 
         # Оставляем лишь координатные
         df_DBF = df_DBF_raw.loc[df_DBF_raw['#LAT'] != ""].copy(deep=True)
+
+        # записи без координат, если пусто - выходим
+        num_of_no_coord_records = len(df_DBF_raw) - len(df_DBF)
+        if num_of_no_coord_records != 0:
+            return None
+
+        print("# Info (KML): Записей без координат: ", num_of_no_coord_records)
 
         # print (df_DBF['#FEA_NUM'])
 
@@ -413,16 +423,16 @@ class bKML:
             anom_kml_data = current_anom_df[
                 ['ML_DESCR', '#LAT', '#LONG', '#DEPTH_PRC', '#DIST_START', '#LOC', '#CORR', '#RWT', '#ERF']]
             if current_anom_name in ['Потеря металла', 'Metal Loss', 'Pérdida de metal']:
-                self.kml_write_ml_subranges(kml_data=anom_kml_data, isvisible=[0, 0])
+                self.__kml_write_ml_subranges(kml_data=anom_kml_data, isvisible=[0, 0])
             else:
-                self.kml_write_anomaly(feature_name=current_anom_name, kml_data=anom_kml_data, isvisible=[0, 0])
+                self.__kml_write_anomaly(feature_name=current_anom_name, kml_data=anom_kml_data, isvisible=[0, 0])
 
         other_df = df_DBF.loc[df_DBF['#KML_CLASS'] == 'OTH']
         other_list = other_df['#FEA_CODE_REPLACE'].value_counts(ascending=True)
         for current_anom_name, row in other_list.items():
             current_anom_df = df_DBF.loc[df_DBF['#FEA_CODE_REPLACE'] == current_anom_name]
             other_kml_data = current_anom_df[["OTH_DESCR", '#LAT', '#LONG']]
-            self.kml_write_others(feature_name=current_anom_name, kml_data=other_kml_data, isvisible=[0, 0])
+            self.__kml_write_others(feature_name=current_anom_name, kml_data=other_kml_data, isvisible=[0, 0])
 
         construct_df = df_DBF.loc[df_DBF['#KML_CLASS'] == 'CON']
         construct_list = construct_df['#FEA_CODE_REPLACE'].value_counts(ascending=True)
@@ -434,8 +444,8 @@ class bKML:
                 isvisible = [1, 0]
             else:
                 isvisible = [0, 0]
-            self.kml_write_construction(feature_name=current_anom_name, kml_data=construct_kml_data,
-                                        isvisible=isvisible)
+            self.__kml_write_construction(feature_name=current_anom_name, kml_data=construct_kml_data,
+                                          isvisible=isvisible)
 
         top_df = df_DBF.loc[df_DBF['#KML_CLASS'] == 'TOP']
         top_list = top_df['#FEA_CODE_REPLACE'].value_counts(ascending=True)
@@ -453,39 +463,43 @@ class bKML:
 
             # add_to_line = True if current_anom_name == "GPS TMP" else False
 
-            self.kml_write_top_lvl(feature_name=current_anom_name, kml_data=top_kml_data,
-                                   isvisible=isvisible, points_folder=points_folder)
+            self.__kml_write_top_lvl(feature_name=current_anom_name, kml_data=top_kml_data,
+                                     isvisible=isvisible, points_folder=points_folder)
 
-        absbath = os.path.dirname(self.dbf_path)
-        basename = os.path.basename(self.dbf_path)
+        absbath = os.path.dirname(export_path)
+        basename = os.path.basename(export_path)
         exportpath = os.path.join(absbath, basename)
         exportpath = f'{exportpath[:-4]}'
 
-        self.kml_save(exportpath)
+        self.__kml_save(exportpath)
 
-        no_coord_records = len(df_DBF_raw) - len(df_DBF)
-        print("\n~~~Done~~~")
-        print(f"Обработано записей: {len(df_DBF_raw)}")
-        if no_coord_records > 0:
-            print("Записей без координат: ", no_coord_records)
+        print(f"# Info (KML): Обработано записей: {len(df_DBF_raw)}")
+
+        return exportpath + '.kmz'
+
         # print(f"KML создана по {len(df_DBF)} записям"'\n')
 
 
-def main():
+def __main():
+
     DEBUG = 1
 
+    kml_class = bKML()
+
     if DEBUG == 1:
-        path = r'c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\Test\1nxbu.dbf'
+        path = r'd:\OneDrive\Macro\PYTHON\bKML\Test\2nwfm.DBF'
         diameter = 11
         lang = 'RU'
-        bKML(dbf_path=path, lang=lang, diameter=diameter).dbf_to_kml()
+        cls, df, dbf_path = kml_class.dbf_load(dbf_path=path, lang=lang, diameter=diameter)
+        kml_class.dbf_to_kml(line_width=3, df=df, df_dbf_class=cls, export_path=dbf_path)
     else:
         try:
             lang = 'RU'
             path = input("Enter DBF path: ")
             diameter = float(input("Enter Diameter: "))
 
-            bKML(dbf_path=path, lang=lang, diameter=diameter).dbf_to_kml()
+            cls, df, dbf_path = kml_class.dbf_load(dbf_path=path, lang=lang, diameter=diameter)
+            kml_class.dbf_to_kml(line_width=3, df=df, df_dbf_class=cls, export_path=dbf_path)
             input("~~~Done~~~")
         except Exception as ex:
             print(ex)
@@ -494,4 +508,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    __main()

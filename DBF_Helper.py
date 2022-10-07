@@ -26,7 +26,7 @@ class DBFHelper:
         self.window.resizable(False, False)
         self.window.attributes('-topmost', True)
         # убираем windows стандатрные кнопки
-        self.window.attributes('-toolwindow', True)
+        # self.window.attributes('-toolwindow', True)
         # self.window.attributes('-transparentcolor', "white")
 
         self.cfg = CFG('DBF Helper')
@@ -77,6 +77,13 @@ class DBFHelper:
         self.dbf_columns_combobox = ttk.Combobox(self.dbf_columns_frame, values=["No Columns"],
                                                  postcommand=self.columns_list_update)
 
+        self.on_top_variable = BooleanVar()
+        self.on_top_variable.set(1)
+        self.on_top_btn = Checkbutton(self.window, text="Top",
+                         variable=self.on_top_variable,
+                         onvalue=1, offvalue=0,
+                         command=self.stay_on_top)
+
         self.window.drop_target_register(DND_FILES)
         self.window.dnd_bind('<<Drop>>', self.open_with_dnd)
 
@@ -108,6 +115,10 @@ class DBFHelper:
         self.auto_save()
         self.window.mainloop()
 
+    def stay_on_top(self):
+        self.window.attributes('-topmost', self.on_top_variable.get())
+
+
     def save_backup_manual(self):
         backup = BackupFile(self.dbf_path, mode='manual')
         backup.save_backup()
@@ -138,8 +149,10 @@ class DBFHelper:
 
     def place_elements(self):
 
-        self.act_file_frame.grid(row=0, column=0, sticky=EW, columnspan=3)
-        self.act_file_label.grid(row=0, column=0, sticky=EW, columnspan=3)
+        self.act_file_frame.grid(row=0, column=0, sticky=EW, columnspan=2)
+        self.act_file_label.grid(row=0, column=0, sticky=EW, columnspan=2)
+
+        self.on_top_btn.grid(row=0, column=2, sticky=EW, columnspan=1)
 
         self.file_frame.grid(row=1, column=0, sticky=EW, columnspan=3)
         self.open_button.grid(row=1, column=0, padx=2, pady=2)

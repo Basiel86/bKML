@@ -95,9 +95,14 @@ def save_template(template_name: str, columns_list: list):
                                    icon='info')
             print("### Info: Template Saved!")
     else:
-        messagebox.showwarning(f'Save template Warning', f"<{template_name}> template already exists!!", icon='warning')
-        print(f"### Error: <{template_name}> template already exists!!")
+        rewrite = messagebox.askquestion(f'Save template Warning',
+                                         f"<{template_name}> template already exists!!\n\t"
+                                         f"Rewrite?", icon='warning')
 
+        if rewrite == 'yes':
+            rewrite_template(template_name=template_name, columns_list=columns_list)
+            # messagebox.showwarning(f'Save template Warning', f"<{template_name}> template already exists!!", icon='warning')
+            print(f"### Error: <{template_name}> template already exists!! Rewrite?")
 
 def rewrite_template(template_name: str, columns_list: list):
 
@@ -106,6 +111,9 @@ def rewrite_template(template_name: str, columns_list: list):
         # open('file.txt', 'w').close()
         with open(template_path, 'w', encoding='utf8') as file:
             file.write(json.dumps(columns_list, indent=3, ensure_ascii=False))
+            messagebox.showwarning(f'Rewrite template Info', f"<{template_name}> template Rewrited",
+                                   icon='info')
+            print("### Info: Template Rewrited!")
 
 
 def slugify(value, allow_unicode=True):

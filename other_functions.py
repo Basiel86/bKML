@@ -1,10 +1,18 @@
 import pyfiglet
+import os
 
 
 def print_all_pyfiglet():
     fig = pyfiglet.Figlet()
     for font in fig.getFonts():
         print(font + '\n\n' + pyfiglet.figlet_format('DBF to KML', font=font), '\n\n')
+
+
+def cls_pyfiglet(pyfiglet_msg, pyfiglet_font):
+    os.system('cls')
+    # 'fender' 'kban' 'larry3d'
+    print('\n' + pyfiglet.figlet_format(pyfiglet_msg, justify='center', font=pyfiglet_font))
+
 
 
 def empty_if_nan(poss_nan):

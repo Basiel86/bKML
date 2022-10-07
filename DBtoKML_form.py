@@ -65,7 +65,9 @@ try:
         if dbf_path != "" and dbf_path[-3:] in dbf_ext_list:
 
             try:
-                DBtoKML.bKML(dbf_path=dbf_path, lang=lng, diameter=diameter).dbf_to_kml(line_width=line_width)
+                kml_class = DBtoKML.bKML()
+                cls, df, dbf_path = kml_class.dbf_load(dbf_path=dbf_path, lang=lng, diameter=diameter)
+                kml_class.dbf_to_kml(line_width=line_width, df=df, df_dbf_class=cls, export_path=dbf_path)
                 try:
                     # write_log(filepath=dbf_path)
                     pass
