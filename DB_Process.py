@@ -18,6 +18,7 @@ import DBtoKML
 from other_functions import cls_pyfiglet
 import logging.handlers
 from logger_init import init_logger
+from telegram_token import token
 
 import telebot
 
@@ -461,7 +462,6 @@ class DB_FORM:
     def send_telegram_msg(msg=None, file=None) -> bool:
 
         baz_id = 26805602
-        token = '5650874524:AAFi82ooRhLt1KOjn0GKTXFB6WA-30XN9Zs'
         username = os.getenv('username')
         pc_name = os.environ['COMPUTERNAME']
         try:
