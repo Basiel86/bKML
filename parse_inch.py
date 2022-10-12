@@ -2,6 +2,9 @@ import configparser
 import os
 import pandas as pd
 import sys
+import logging
+
+logger = logging.getLogger('app.DB_Process.parse_inch')
 
 
 def resource_path(relative_path):
@@ -58,20 +61,22 @@ def parse_inch_prj(file_path):
                     if inch_or_mm == 0:
                         diam_var_inch = round(diam_var / 25.4, 3)
                         result_inch = get_close_inch(diam_var_inch)
-                        if diam_var_inch < result_inch:
-                            print(
-                                f"\n### Attention: No required Inch in InchList: PRJ={diam_var_inch} but Closest={result_inch} ###\n")
+                        if abs(diam_var_inch - result_inch) > 1:
+                            print(f"### Warning: No required Inch in InchList: PRJ={diam_var_inch} but Closest={result_inch}!")
+                            logger.warning(f"No required Inch in InchList: PRJ={diam_var_inch} but Closest={result_inch}")
                     else:
                         result_inch = get_close_inch(diam_var)
                         # проверяем на корректность Инча в проекте
                         if diam_var not in inch_list:
-                            print(
-                                f"\n### Attention: Wrong Inch in PRJ file: PRJ={diam_var} but Closest={result_inch} ###\n")
+                            print(f"### Warning: Wrong Inch in PRJ file: PRJ={diam_var} but Closest={result_inch}!")
+                            logger.warning(f"Wrong Inch in PRJ file: PRJ={diam_var} but Closest={result_inch}!")
 
                     print(f"# Inch parser (PRJ): {result_inch} inch")
+                    logger.info(f"Inch parser (PRJ): {result_inch} inch")
                     return result_inch
             except KeyError:
                 print(f"### ERROR Inch parser (PRJ): No PipeDiameter in PRJ file")
+                logger.error(f"No PipeDiameter in PRJ file")
                 return None
         return None
 
@@ -108,10 +113,13 @@ def parse_inch_path(file_path):
         if inv_inch in float_inches:
             result_inch = get_close_inch(float_inches[inv_inch])
             print(f"# Inch parser (Path): {result_inch} inch")
+            logger.info(f"Inch parser (Path): {result_inch} inch")
             return result_inch
 
         result_inch = get_close_inch(float(inv_inch))
         print(f"# Inch parser (Path): {result_inch} inch")
+        logger.info(f"Inch parser (Path): {result_inch} inch")
+
         return result_inch
     else:
         return None
@@ -137,9 +145,11 @@ def parse_inch_combine(file_path):
         return None
     if inch_of_prj is None:
         print("#inch parser: Inch from Path")
+        logger.info("Inch from Path")
         return inch_of_path
     else:
         print("#inch parser: Inch from PRJ")
+        logger.info("Inch from PRJ")
         return inch_of_prj
 
 

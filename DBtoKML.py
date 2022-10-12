@@ -3,6 +3,10 @@ import DF_DBF
 import os
 import traceback
 
+import logging
+
+logger = logging.getLogger('app.DBtoKML')
+
 ml_range_colors = {'0-10': [99, 190, 123],
                    '10-20': [138, 201, 125],
                    '20-30': [177, 212, 127],
@@ -323,12 +327,19 @@ class bKML:
         # tmp_lines_folder = tmp_folder.newfolder(name=lname)
 
         for elem_id in range(len(kml_data)):
-            current_coord = [(kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 1])]
-            feature_line.append((kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 1]))
+
             point_descr = kml_data.iloc[elem_id, 0]
+            point_remarks = kml_data.iloc[elem_id, 3]
+
+            current_coord = [(kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 1])]
+
+            # если коммента - Отвод Середина нет ни в десрипшне ни в ремарке - исключаем из использования в линии
+            # отвод середину скипаем из линии
+            if 'отвод середина' not in str(point_descr).lower() and 'отвод середина' not in str(point_remarks).lower():
+                feature_line.append((kml_data.iloc[elem_id, 2], kml_data.iloc[elem_id, 1]))
 
             # точки с GPS TMP не пишем
-            if 'отвод' not in point_descr:
+            if 'отвод' not in str(point_descr).lower() and 'отвод' not in str(point_remarks).lower():
                 point = tmp_points_folder.newpoint(name=point_descr, coords=current_coord,
                                                    visibility=point_visibility)
                 if feature_name in ['Маркер', 'Marker']:
@@ -385,10 +396,13 @@ class bKML:
 
         # записи без координат, если пусто - выходим
         num_of_no_coord_records = len(df_DBF_raw) - len(df_DBF)
-        if num_of_no_coord_records != 0:
+        if len(df_DBF) == 0:
+            print("# Info (KML): No features with coordinates found")
+            logger.warning('No features with coordinates found')
             return None
 
-        print("# Info (KML): Записей без координат: ", num_of_no_coord_records)
+        print(f"# Info (KML): Total records with NO coordinates: {num_of_no_coord_records}")
+        logger.info(f"Total records with NO coordinates: {num_of_no_coord_records}")
 
         # print (df_DBF['#FEA_NUM'])
 
@@ -453,11 +467,11 @@ class bKML:
             current_anom_df = df_DBF.loc[df_DBF['#FEA_CODE_REPLACE'] == current_anom_name]
 
             if current_anom_name in ['Шов', 'Weld']:
-                top_kml_data = current_anom_df[["WELD_DESCR", '#LAT', '#LONG']]
+                top_kml_data = current_anom_df[["WELD_DESCR", '#LAT', '#LONG', '#REMARKS']]
                 isvisible = [0, 1]
                 points_folder = True
             else:
-                top_kml_data = current_anom_df[["OTH_DESCR", '#LAT', '#LONG']]
+                top_kml_data = current_anom_df[["OTH_DESCR", '#LAT', '#LONG', '#REMARKS']]
                 isvisible = [1, 0]
                 points_folder = False
 
@@ -474,20 +488,22 @@ class bKML:
         self.__kml_save(exportpath)
 
         print(f"# Info (KML): Обработано записей: {len(df_DBF_raw)}")
+        logger.info(f"Обработано записей: {len(df_DBF_raw)}")
 
         return exportpath + '.kmz'
 
         # print(f"KML создана по {len(df_DBF)} записям"'\n')
 
-
 def __main():
 
-    DEBUG = 1
+    DEBUG = 0
+
 
     kml_class = bKML()
 
     if DEBUG == 1:
-        path = r'd:\OneDrive\Macro\PYTHON\bKML\Test\2nwfm.DBF'
+        path = r'd:\###WORK\###\1nzhu_new_bends.dbf'
+        #path = r'd:\###WORK\###\123\1nzhu_new_bends.dbf'
         diameter = 11
         lang = 'RU'
         cls, df, dbf_path = kml_class.dbf_load(dbf_path=path, lang=lang, diameter=diameter)
@@ -500,7 +516,7 @@ def __main():
 
             cls, df, dbf_path = kml_class.dbf_load(dbf_path=path, lang=lang, diameter=diameter)
             kml_class.dbf_to_kml(line_width=3, df=df, df_dbf_class=cls, export_path=dbf_path)
-            input("~~~Done~~~")
+            input("~~~Done~~~\n")
         except Exception as ex:
             print(ex)
             print(traceback.format_exc())

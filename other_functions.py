@@ -1,5 +1,8 @@
 import pyfiglet
 import os
+import logging
+
+logger = logging.getLogger('app.other_functions')
 
 
 def print_all_pyfiglet():
@@ -10,9 +13,9 @@ def print_all_pyfiglet():
 
 def cls_pyfiglet(pyfiglet_msg, pyfiglet_font):
     os.system('cls')
+
     # 'fender' 'kban' 'larry3d'
     print('\n' + pyfiglet.figlet_format(pyfiglet_msg, justify='center', font=pyfiglet_font))
-
 
 
 def empty_if_nan(poss_nan):

@@ -6,6 +6,9 @@ from tkinter import messagebox
 
 from Export_columns import exp_format
 import json
+import logging
+
+logger = logging.getLogger('app.DB_Process.parse_templates')
 
 template_folder_name = os.path.expanduser(r'~\Documents\DB Process\# Custom Templates')
 # template_folder_name = resource_path(r'# Custom Templates')
@@ -19,6 +22,7 @@ def _check_templates_folder():
     if not os.path.exists(template_folder_name):
         os.makedirs(template_folder_name)
         print(f"### Info: Default templates folder created: {template_folder_name}")
+        logger.info(f"### Info: Default templates folder created: {template_folder_name}")
 
     default_template_path = os.path.join(template_folder_name, "Default.json")
     if not os.path.exists(default_template_path):
@@ -59,9 +63,10 @@ def read_template(template_name: str) -> list:
             template_columns = json.load(json_file)
             return template_columns
     else:
-        messagebox.showwarning(f'Read template Warning', f"<{template_name}> template is not exist!!",
+        messagebox.showwarning(f'Read template Warning', f"<{template_name}> template does not exist!!",
                                icon='warning')
         print("### Error: Template file is not exist!")
+        logger.error(f'Read template Warning: <{template_name}> template does not exist!!')
         return []
 
 
@@ -76,9 +81,11 @@ def delete_template(template_name: str):
             os.remove(template_path)
         messagebox.showwarning(f'Delete template Info', f"<{template_name}> deleted.",
                                icon='info')
+        logger.info(f'Delete template Info: <{template_name}> deleted')
     else:
         messagebox.showwarning(f'Delete template Info', f"You can't delete <{template_name}> template!", icon='info')
         print("### Info: Default template file deletion is prohibited!")
+        logger.error(f"Delete template Info: You can't delete <{template_name}> template!")
 
 
 def save_template(template_name: str, columns_list: list):
@@ -94,6 +101,7 @@ def save_template(template_name: str, columns_list: list):
             messagebox.showwarning(f'Save template Info', f"<{template_name}> template Saved",
                                    icon='info')
             print("### Info: Template Saved!")
+            logger.info(f'Save template Info: <{template_name}> template Saved')
     else:
         rewrite = messagebox.askquestion(f'Save template Warning',
                                          f"<{template_name}> template already exists!!\n\t"
@@ -103,6 +111,8 @@ def save_template(template_name: str, columns_list: list):
             rewrite_template(template_name=template_name, columns_list=columns_list)
             # messagebox.showwarning(f'Save template Warning', f"<{template_name}> template already exists!!", icon='warning')
             print(f"### Error: <{template_name}> template already exists!! Rewrite?")
+            logger.info(f"### Error: <{template_name}> template already exists!! Rewrite?")
+
 
 def rewrite_template(template_name: str, columns_list: list):
 
@@ -114,6 +124,7 @@ def rewrite_template(template_name: str, columns_list: list):
             messagebox.showwarning(f'Rewrite template Info', f"<{template_name}> template Rewrited",
                                    icon='info')
             print("### Info: Template Rewrited!")
+            logger.info(f'Rewrite template Info: <{template_name}> template Rewrited')
 
 
 def slugify(value, allow_unicode=True):

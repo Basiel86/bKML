@@ -28,7 +28,7 @@ class BackupFile:
         self.backups_list = []
 
     @staticmethod
-    def stack_put(value: str, lst: list) -> (list, str):
+    def _stack_put(value: str, lst: list) -> (list, str):
         last_element = lst[len(lst) - 1]
         lst_shift = collections.deque(lst)
         lst_shift.rotate(1)
@@ -41,9 +41,9 @@ class BackupFile:
         """
         now = datetime.now()
         dt_string = now.strftime("%Y.%m.%d %H.%M.%S")
-        return self.get_base_name() + f" {self.mode} {dt_string}"
+        return self._get_base_name() + f" {self.mode} {dt_string}"
 
-    def check_backup_folder(self):
+    def _check_backup_folder(self):
         """
         Check and create backup folder
         """
@@ -62,7 +62,7 @@ class BackupFile:
                         self.backups_list.append(filename)
                 self.backups_list.sort(reverse=True)
 
-    def get_base_name(self) -> (str, None):
+    def _get_base_name(self) -> (str, None):
         """
         Return file base name without extension
         :return: Str or None
@@ -73,7 +73,7 @@ class BackupFile:
             return basename[:len(basename) - len(file_ext)]
         return None
 
-    def total_backups_process(self, backup_name, backup_folder_dir_path):
+    def _total_backups_process(self, backup_name, backup_folder_dir_path):
         """
         append new element and if more than max value of backups - remove
         :param backup_name: new backup name
@@ -82,7 +82,7 @@ class BackupFile:
         if len(self.backups_list) < self.total_backups:
             self.backups_list.append(backup_name)
         else:
-            self.backups_list, last_element = self.stack_put(value=backup_name, lst=self.backups_list)
+            self.backups_list, last_element = self._stack_put(value=backup_name, lst=self.backups_list)
             backup_path = os.path.join(backup_folder_dir_path, last_element)
             os.remove(backup_path)
 
@@ -92,7 +92,7 @@ class BackupFile:
         :param print_status: print or not status
         """
         if os.path.exists(self.file_path):
-            self.check_backup_folder()
+            self._check_backup_folder()
             backup_folder_dir_path = os.path.join(self.backup_folder_dir_path,
                                                   self.backup_folder_name,
                                                   os.path.basename(self.file_path))
@@ -100,7 +100,7 @@ class BackupFile:
             backup_path = os.path.join(backup_folder_dir_path, backup_name)
 
             if self.mode == 'auto':
-                self.total_backups_process(backup_name=backup_name, backup_folder_dir_path=backup_folder_dir_path)
+                self._total_backups_process(backup_name=backup_name, backup_folder_dir_path=backup_folder_dir_path)
 
             # название и путь Zip файла
             with zipfile.ZipFile(backup_path, 'w',
@@ -118,7 +118,7 @@ class BackupFile:
 if __name__ == '__main__':
     from queue import LifoQueue
 
-    path = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\file.txt"
+    path = r"d:\###WORK\NCTO\Beloyarskneftegaz\NBD 8 inch НН Средне-Хулымское м.р. - п. Бобровка ПК0-ПК29, 29 km\Фотки\02 Фото\02 Фото\КП\IMG_20220626_131005.jpg"
 
     z = BackupFile(file_path=path, mode='auto')
     z.save_backup(print_status=True)

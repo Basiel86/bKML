@@ -75,6 +75,9 @@ class CFG(object):
                 self.store_settings(section=section, key=key, value=default)
             return None
 
+    def get_cfg_project_folder(self):
+        return self.cfg_project_path
+
 
 if __name__ == '__main__':
     cfg1 = CFG("PY_project")

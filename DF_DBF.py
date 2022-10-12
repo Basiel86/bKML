@@ -13,11 +13,13 @@ from parse_templates import read_template
 import traceback
 import codecs
 import shutil
-
 import time
+import logging
 
 # столбцы для дэфолтного экспорта
 from Export_columns import exp_format
+
+logger = logging.getLogger('app.DF_DBF')
 
 # index_filename_remote_path = r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\DBF_INDEX.xlsx'
 index_filename_local_path = r'IDs\DBF_INDEX.xlsx'
@@ -57,23 +59,28 @@ def remote_or_local(remote_path, local_path, cfg_path, local):
 
     if local is True:
         print(f"# Info: {filename} file info: Local (INI)")
+        logger.debug(f"#{filename} file info: Local (INI)")
         return local_path
 
     try:
         if cfg_path is not None:
             if os.path.exists(cfg_path):
                 print(f"# Info: {filename} file info: INI")
+                logger.debug(f"{filename} file info: INI")
                 return cfg_path
 
         if remote_path is not None:
             if os.path.exists(remote_path):
                 print(f"# Info: {filename} file info: Remote")
+                logger.debug(f"{filename} file info: Remote")
                 return remote_path
 
         print(f"# Info: {filename} file info: Local")
+        logger.debug(f"{filename} file info: Local")
         return resource_path(local_path)
     except Exception as ex:
         input(f"### ERROR: Remote or Local proc: {ex}")
+        logger.exception('Remote or Local processing')
 
 
 class df_DBF():
@@ -95,6 +102,8 @@ class df_DBF():
             self.df_index_fea_code = pd.read_excel(self.index_filename, sheet_name='FEA_CODE')
             self.df_index_har_code1 = pd.read_excel(self.index_filename, sheet_name='HAR_CODE1')
 
+            self.df_dbf = None
+
             # списки с описаниями в FT или Description
             har_code1_ft_list_RU = self.df_index_har_code1.loc[self.df_index_har_code1['LOC'] == 'FT']['RU'].tolist()
             har_code1_ft_list_EN = self.df_index_har_code1.loc[self.df_index_har_code1['LOC'] == 'FT']['EN'].tolist()
@@ -115,6 +124,7 @@ class df_DBF():
         except OSError as e:
             if e.errno == errno.EACCES:
                 print("# Permission ERROR: DBF_INDEX.xlsx")
+                logger.error('Permission ERROR: DBF_INDEX.xlsx')
                 sys.exit()
         try:
             self.df_struct = pd.read_excel(self.struct_filename, sheet_name='STRUCT')
@@ -123,6 +133,7 @@ class df_DBF():
         except OSError as e:
             if e.errno == errno.EACCES:
                 print("# Permission ERROR: STRUCT.xlsx")
+                logger.error('Permission ERROR: STRUCT.xlsx')
                 sys.exit()
 
         self.ml_list = self.df_index_fea_code.loc[self.df_index_fea_code['KML_D_TYPE'] == 'ML', 'ID']
@@ -134,36 +145,53 @@ class df_DBF():
 
         self.dbf_path = dbf_path
 
-        print("# DB load status: Loading...")
+        try:
+            print("# DB load status: Loading...")
 
-        dbf_raw = Dbf5(dbf_path, codec='cp1251')
-        self.df_dbf = dbf_raw.to_dataframe()
+            logger.info(msg='#'*len(self.dbf_path))
+            logger.debug(f'Get DBF file: {self.dbf_path}')
+            dbf_raw = Dbf5(dbf_path, codec='cp1251')
+            self.df_dbf = dbf_raw.to_dataframe()
 
-        # переименовываем столбцы
-        for i, row in self.df_struct.iterrows():
-            struct_column_to_replace = str(self.df_struct.loc[i]["DBF_COL"])
-            struct_column_target_name = str(self.df_struct.loc[i]["TARGET_COL_NAME"])
-            if struct_column_to_replace in self.df_dbf.columns:
-                self.df_dbf = self.df_dbf.rename(columns={struct_column_to_replace: struct_column_target_name})
+            if 'F' not in self.df_dbf.columns:
+                print('### WARNING: DB has not Proper Format, please run DBColumns First!!!')
+                logger.warning('### WARNING: DB has not Proper Format, please run DBColumns First!!!')
 
-        self.df_dbf['#FEA_CODE_REPLACE'] = self.df_dbf['#FEA_CODE']
-        self.df_dbf['#HAR_CODE1_REPLACE'] = self.df_dbf['#HAR_CODE1']
-        self.df_dbf['#HAR_CODE2_REPLACE'] = self.df_dbf['#HAR_CODE2']
-        self.df_dbf['#KML_CLASS'] = self.df_dbf['#FEA_CODE']
-        self.df_dbf['#FEATURE'] = self.df_dbf['#FEA_CODE']
-        self.df_dbf['#FEA_CODE_REPLACE_FT'] = self.df_dbf['#FEA_CODE']
-        self.df_dbf['#JL'] = ''
-        self.df_dbf['#DIMM'] = ''
-        self.df_dbf['#DESCR'] = ''
-        # self.df_dbf['#REMAIN_WT'] = ''
-        self.df_dbf['#ORIENT_HOUR'] = ''
-        self.df_dbf['#BLANK'] = ''
+            # переименовываем столбцы
+            for i, row in self.df_struct.iterrows():
+                struct_column_to_replace = str(self.df_struct.loc[i]["DBF_COL"])
+                struct_column_target_name = str(self.df_struct.loc[i]["TARGET_COL_NAME"])
+                if struct_column_to_replace in self.df_dbf.columns:
+                    self.df_dbf = self.df_dbf.rename(columns={struct_column_to_replace: struct_column_target_name})
 
-        if "#CORR" not in self.df_dbf.columns:
-            self.df_dbf['#CORR'] = ''
+            self.df_dbf['#FEA_CODE_REPLACE'] = self.df_dbf['#FEA_CODE']
+            self.df_dbf['#HAR_CODE1_REPLACE'] = self.df_dbf['#HAR_CODE1']
+            self.df_dbf['#HAR_CODE2_REPLACE'] = self.df_dbf['#HAR_CODE2']
+            self.df_dbf['#KML_CLASS'] = self.df_dbf['#FEA_CODE']
+            self.df_dbf['#FEATURE'] = self.df_dbf['#FEA_CODE']
+            self.df_dbf['#FEA_CODE_REPLACE_FT'] = self.df_dbf['#FEA_CODE']
+            self.df_dbf['#JL'] = ''
+            self.df_dbf['#DIMM'] = ''
+            self.df_dbf['#DESCR'] = ''
+            # self.df_dbf['#REMAIN_WT'] = ''
+            self.df_dbf['#ORIENT_HOUR'] = ''
+            self.df_dbf['#BLANK'] = ''
 
-        if "#WT" not in self.df_dbf.columns:
-            self.df_dbf['#WT'] = ''
+            if "#CORR" not in self.df_dbf.columns:
+                self.df_dbf['#CORR'] = ''
+
+            if "#REMARKS" not in self.df_dbf.columns:
+                self.df_dbf['#REMARKS'] = ''
+
+            if "#WT" not in self.df_dbf.columns:
+                self.df_dbf['#WT'] = ''
+
+            if "F" not in self.df_dbf.columns:
+                self.df_dbf['F'] = ''
+
+        except Exception as ex:
+            print(f'### ERROR: Unhandled load_dbf error: {ex}')
+            logger.exception('Unhandled load_dbf error')
 
     def get_color_type_df(self, lng):
         return self.df_index_fea_code[['COLOR_TYPE', f'FEA_{lng}']]
@@ -275,6 +303,7 @@ class df_DBF():
 
         ts = time.time()
         self.load_dbf(dbf_path=dbf_path)
+        logger.debug(f'Timer: DBF load time: {round(time.time()-ts,3)} s.')
         # print_time_spent(ts, time.time(), descr="'DBF Load'")
 
         if diameter < 100:
@@ -290,7 +319,7 @@ class df_DBF():
         self.df_replace(self.df_index_rep_method, '#REP_METHOD')
 
         # print_time_spent(tsr, time.time(), descr="'REPLACE'")
-
+        logger.debug(f'Timer: Replace time: {round(time.time()-tsr,3)} s.')
         ts = time.time()
 
         # exportpath = r'd:\WORK\OrenburgNeft\NOA 8 inch DNS Olhovskaya to Terminal Service, 19.749 km\Reports\PR\Run3\DB_corr dist\123.csv'
@@ -374,6 +403,7 @@ class df_DBF():
                 self.df_dbf['#JL'] = self.df_dbf['#JN_Custom'].map(welds_jn_dist_array.set_index('#JN_Custom')['#JL'])
             except Exception as ex:
                 print('## ERROR: no Welds, JL not calculated: ', ex)
+                logger.error('no Welds, JL not calculated')
 
             # маска для потерей металла под расчет DIMM
             mask = self.df_dbf['#FEA_CODE'].isin(self.ml_list) & \
@@ -387,21 +417,26 @@ class df_DBF():
                                      return_format=self.lng), axis=1)
             except Exception as ex:
                 print('# Info: no ML in DB detected')
+                logger.error('no ML in DB detected')
 
             self.df_dbf = self.df_dbf.replace({'nan': '', 'NaN': '', float('NaN'): '', -1111111: ''})
 
             print("# DB load status: Loaded successfully!\n")
+            logger.info("DB load status: Loaded successfully")
 
             # print_time_spent(ts, time.time(), descr="'DBF Convert to DF'")
+            logger.debug(f'Timer: DBF to DF conversion: {round(time.time()-ts,3)} s.')
 
             return self.df_dbf
 
         except ValueError:
             print(traceback.format_exc())
             input("\n### Error: DB Error, try process it by DBFnewColumns and repeat, if So, call Developer!")
+            logger.exception('DB Error, try process it by DBFnewColumns and repeat, if So, call Developer!')
         except Exception as ex:
             print(ex)
             input(traceback.format_exc())
+            logger.exception("Something went wrong")
 
     def df_replace(self, df_what, replace_column_name, change_class=False, fea=False, ftype=False):
 
@@ -436,6 +471,9 @@ class df_DBF():
 
 
 def export_default(dbf_path):
+
+    logger.info("DB Export")
+
     lang = "RU"
     path = dbf_path
 
@@ -488,8 +526,9 @@ def export_default(dbf_path):
         os.startfile(exportpath_csv)
         # to_excel_custom_header(df=exp1, excel_path=exportpath_xlsx, column_names=column_names)
 
-    except Exception as PermissionError:
+    except PermissionError:
         print(f"'{basename[:-4]}.csv' is opened, saved as '{basename[:-4]}_1.csv'")
+        logger.error(f"'{basename[:-4]}.csv' is opened, saved as '{basename[:-4]}_1.csv'")
         exportpath = os.path.join(absbath, basename)
         exportpath_csv = f'{exportpath[:-4]}_1.csv'
         exportpath_xlsx = f'{exportpath[:-4]}_1.xlsx'
@@ -504,6 +543,7 @@ def export_default(dbf_path):
 # сохраняем в csv c custom столбцами
 def to_csv_custom_header(df, csv_path, column_names, csv_encoding):
     print(f'# Info (DF_DBF): Columns saved: {len(column_names)}')
+    logger.info(f'# Excel custom header Info (DF_DBF): Columns saved: {len(column_names)}')
     # print(f'# Custom headers info: Columns list: {column_names}')
 
     with open(csv_path, 'w') as csvfile:
@@ -533,7 +573,9 @@ def change_1251_csv_encoding(file_path):
 
 # сохраняем в csv c custom столбцами
 def to_excel_custom_header(df, excel_path, column_names):
-    print(f'# Info DF_DBF: {len(column_names)}')
+    print(f'# Info (DF_DBF): {len(column_names)}')
+    logger.info(f'# Excel cutom header Info (DF_DBF): Columns saved: {len(column_names)}')
+
 
     df.columns = column_names
     with pd.ExcelWriter(excel_path) as writer:
@@ -568,7 +610,7 @@ if __name__ == '__main__':
     custom_columns = []
 
     if DEBUG == 1:
-        path = r"c:\Users\Vasily\OneDrive\Macro\PYTHON\bKML\Test\3nocm.DBF"
+        path = r"d:\###WORK\###\123\1nzhu_new_bends.dbf"
     else:
         arg = ''
 

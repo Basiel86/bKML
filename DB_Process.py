@@ -10,29 +10,36 @@ from ttkwidgets import CheckboxTreeview
 from parse_inch import parse_inch_prj
 import traceback
 from columnsCountValSort import columns_count_val_sort, load_columns_stat_dict
-import pyfiglet
 from parse_templates import *
 from play_sound import PlaySound
 from parse_cfg import CFG
 from TkinterDnD2 import *
 import DBtoKML
 from other_functions import cls_pyfiglet
+import logging.handlers
+from logger_init import init_logger
+
+import telebot
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
-DEBUG = 1
+DEBUG = False
+
+logger = logging.getLogger('app.DB_Process')
 
 
 class DB_FORM:
 
     def __init__(self):
 
-        self.EXP_DAY = '2022-10-15'
-        # 'fender' 'kban' 'larry3d'
-        # print('\n' + pyfiglet.figlet_format("DB Process", justify='center', font='larry3d'))
-        cls_pyfiglet('DB Process', 'larry3d')
+        self.EXP_DAY = '2022-10-22'
 
+        cls_pyfiglet('DB Process', 'larry3d')
         self.cfg = CFG('DB Process')
+        self.log_path = os.path.join(self.cfg.get_cfg_project_folder(), 'DB_Process.log')
+        init_logger('app', log_pth=resource_path(self.log_path), print_console=DEBUG)
+
+        # bot.polling(none_stop=True, interval=0)
 
         # self.updater_name = 'DB Process'
         # self.updater = BUpdater(self.updater_name)
@@ -90,8 +97,8 @@ class DB_FORM:
                                               default=r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\DBF_INDEX.xlsx')
         struct_remote_path = self.cfg.read_cfg(section="PATHS", key="struct_share", create_if_none=True,
                                                default=r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\STRUCT.xlsx')
-        local = self.cfg.read_cfg(section="PATHS", key="local", create_if_none=True, default=False)
 
+        local = self.cfg.read_cfg(section="PATHS", key="local", create_if_none=True, default=True)
         self.df_dbf_class = df_DBF(index_remote_path=index_remote_path,
                                    index_path=index_cfg_path,
                                    struct_remote_path=struct_remote_path,
@@ -100,27 +107,18 @@ class DB_FORM:
         self.db_df = pd.DataFrame
 
         self.db_process_form = TkinterDnD.Tk()
+
+        self.db_process_form.iconbitmap(resource_path('icons/DBF_icon.ico'))
         self.db_process_form.drop_target_register(DND_FILES)
         self.db_process_form.dnd_bind('<<Drop>>', self.open_with_dnd)
 
         self.menu_main = Menu(self.db_process_form)
-
         self.db_process_form.config(menu=self.menu_main)
-
-        self.tabs_main = ttk.Notebook(self.db_process_form)
-        self.tab1 = ttk.Frame(self.tabs_main)
-        self.tab2 = ttk.Frame(self.tabs_main)
-        self.tab3 = ttk.Frame(self.tabs_main)
-        self.tab4 = ttk.Frame(self.tabs_main)
-        self.tabs_main.add(self.tab1, text='Columns')
-        self.tabs_main.add(self.tab2, text='Helper')
-        self.tabs_main.add(self.tab3, text='KML')
-        self.tabs_main.add(self.tab4, text='Other')
-
-        self.tabs_main.select(self.get_def_tab())
 
         file_menu = Menu(self.menu_main, tearoff=0)
         file_menu.add_command(label="Open...", command=self.openfile)
+        file_menu.add_separator()
+        file_menu.add_command(label="Load DB...", command=lambda: self.db_load(cls=True))
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.on_closing)
         self.menu_main.add_cascade(label="File",
@@ -138,88 +136,73 @@ class DB_FORM:
 
         others_menu = Menu(self.menu_main, tearoff=0)
         others_menu.add_command(label="Open Config Folder", command=parse_templates.open_templates_folder)
+        others_menu.add_command(label="Open Log", command=lambda: os.startfile(self.log_path))
+        others_menu.add_command(label="Write Developer MSG", command=self.write_to_developer)
         others_menu.add_command(label="Save Tab Position",
                                 command=lambda: self.cfg.store_settings('GENERAL', 'default_tab',
-                                                                        self.tabs_main.index(
-                                                                            self.tabs_main.select()) + 1))
+                                                                        self.tabs_main_func.index(
+                                                                            self.tabs_main_func.select()) + 1))
         self.menu_main.add_cascade(label="Configs", menu=others_menu)
 
-        self.columns_variable = StringVar(self.tab1)
-        self.columns_textbox = Entry(self.tab1, textvariable=self.columns_variable)
-        self.columns_textbox.bind("<Return>", self.process_custom_columns)
-        self.clear_headers_button = Button(self.tab1, text="Clear", command=self.clear_headers)
+        lang_menu = Menu(self.menu_main, tearoff=0)
+        self.lang_menu_variable = StringVar()
+        self.lang_menu_variable.set(self.lang_list[0])
+        for lang in self.lang_list:
+            lang_menu.add_radiobutton(label=lang, var=self.lang_menu_variable)
+        self.menu_main.add_cascade(label="Language",
+                                   menu=lang_menu)
 
-        self.load_db_button = Button(self.db_process_form, text="Load DB", command=self.db_load)
-        self.csv_export_button = Button(self.db_process_form, text="to CSV", width=10,
-                                        command=lambda: self.db_export(ext='csv'))
-        self.xlsx_export_button = Button(self.db_process_form, text="to XLSX", width=10,
-                                         command=lambda: self.db_export(ext='xlsx'))
-        self.clipboard_db_button = Button(self.db_process_form, text="to Clip", width=10,
+        diam_menu = Menu(self.menu_main, tearoff=0)
+        self.diam_menu_variable = StringVar()
+        self.diam_menu_variable.trace('w', lambda *args: self.diam_menu_change())
+
+        for inch in self.inch_names_list:
+            diam_menu.add_radiobutton(label=inch, var=self.diam_menu_variable, command=self.diam_menu_change)
+        self.menu_main.add_cascade(label="Diameter", menu=diam_menu)
+        self.diam_menu_change()
+
+        self.templates_list = get_templates_list()
+
+        # ///////////////////////////////  TAB FEA
+
+        self.tabs_main_fea = ttk.Notebook(self.db_process_form)
+        self.tab1_fea = ttk.Frame(self.tabs_main_fea)
+        self.tabs_main_fea.add(self.tab1_fea, text='Fea')
+
+        self.export_frame = ttk.Labelframe(master=self.tab1_fea, text='Export')  # , width=50, height=50
+        self.clipboard_db_button = Button(self.export_frame, text="to Clip", width=10,
                                           command=lambda: self.db_export(to_clipboard=True))
+        self.csv_export_button = Button(self.export_frame, text="to CSV", width=10,
+                                        command=lambda: self.db_export(ext='csv'))
+        self.xlsx_export_button = Button(self.export_frame, text="to XLSX", width=10,
+                                         command=lambda: self.db_export(ext='xlsx'))
+        self.KML_btn_fea_tab = Button(self.export_frame, text="to KML", command=self.DB_to_KML)
 
-        self.lang_list_variable = StringVar(self.db_process_form)
-        self.lang_combobox = OptionMenu(self.db_process_form, self.lang_list_variable, *self.lang_list)
-
-        self.blankLabel = Label(self.db_process_form, text="          ")
-
-        self.custom_listbox_raw = Listbox(master=self.tab1, width=30, height=33, exportselection=False)
-        self.custom_listbox_processed = Listbox(master=self.tab1, width=30, height=33, exportselection=False)
-        self.db_columns_listbox = Listbox(master=self.tab1, width=35, height=33, exportselection=False)
-        self.scroll_pane = ttk.Scrollbar(master=self.tab1, command=self.db_columns_listbox.yview)
-        self.db_columns_listbox.configure(yscrollcommand=self.scroll_pane.set)
-
-        image_up = PhotoImage(file='icons/arrrow_up.png')
-        image_dwn = PhotoImage(file='icons/arrrow_dwn.png')
-        self.process_lst_row_up_btn = Button(master=self.tab1, image=image_up,
-                                             command=self.custom_listbox_processed_row_up, width=22)
-        self.process_lst_row_dwn_btn = Button(master=self.tab1, image=image_dwn,
-                                              command=self.custom_listbox_processed_row_dwn, width=22)
-
-        self.clear_process_list_button = Button(master=self.tab1, text="Clear", command=self.clear_process_listbox)
-        self.filter_variable = StringVar()
-        self.filter_variable.trace("w", self.filter_total_columns_listbox)
-        self.filter_total_columns_textbox = Entry(master=self.tab1, width=35,
-                                                  textvariable=self.filter_variable)
-
-        self.diam_list_variable = StringVar(self.db_process_form)
-        self.diam_combobox = OptionMenu(self.db_process_form, self.diam_list_variable, *self.inch_names_list)
-        self.diam_combobox.config(width=20)
-
-        self.checks_cond_var = StringVar(self.db_process_form)
-        self.checks_cond_comb = OptionMenu(self.db_process_form, self.checks_cond_var, *('AND', 'OR'))
-        self.checks_cond_var.set('AND')
+        self.and_or_var = StringVar(self.tab1_fea)
+        self.and_or_comb = OptionMenu(self.tab1_fea, self.and_or_var, *('AND', 'OR'))
+        self.and_or_var.set('AND')
 
         # высота в строках
-        self.stat_tree = CheckboxTreeview(self.db_process_form, show='tree', column="c1", height=20)
+        self.stat_tree = CheckboxTreeview(self.tab1_fea, show='tree', column="c1", height=24)
         self.stat_tree.column("# 1", anchor='center', stretch='NO', width=60)
 
-        self.stat_tree_tags_variable = StringVar(self.db_process_form)
+        self.stat_tree_tags_variable = StringVar(self.tab1_fea)
         self.stat_tree_tags_variable.trace(mode='w', callback=self.stat_tree_tags_option_change)
-        self.stat_tree_tags_combobox = OptionMenu(self.db_process_form, self.stat_tree_tags_variable,
+        self.stat_tree_tags_combobox = OptionMenu(self.tab1_fea, self.stat_tree_tags_variable,
                                                   self.stat_tree_tags_list)
-        self.sel_all_checks_btn = Button(self.db_process_form, text="Select All", command=self.select_all_checks)
-        self.remove_all_checks_btn = Button(self.db_process_form, text="Clear All", command=self.remove_all_checks)
-        self.invert_checks_btn = Button(self.db_process_form, text="Invert", command=self.invert_checks)
+        self.sel_all_checks_btn = Button(self.tab1_fea, text="Select All", command=self.select_all_checks)
+        self.remove_all_checks_btn = Button(self.tab1_fea, text="Clear All", command=self.remove_all_checks)
+        self.invert_checks_btn = Button(self.tab1_fea, text="Invert", command=self.invert_checks)
 
-        self.doc_tree = CheckboxTreeview(self.db_process_form, show='tree', column="c1", height=5)
+        self.doc_tree = CheckboxTreeview(self.tab1_fea, show='tree', column="c1", height=5)
         self.doc_tree.column("# 0", anchor='center', stretch='YES', width=30)
         self.doc_tree.column("# 1", anchor='center', stretch='NO', width=60)
 
-        self.marker_tree = CheckboxTreeview(self.db_process_form, show='tree', column="c1", height=3)
+        self.marker_tree = CheckboxTreeview(self.tab1_fea, show='tree', column="c1", height=3)
         self.marker_tree.column("# 0", anchor='center', stretch='YES', width=30)
         self.marker_tree.column("# 1", anchor='center', stretch='NO', width=60)
 
-        self.play_button = Button(self.tab4, text="Play", command=self.play_sound,
-                                  relief=GROOVE)
-        self.play_button_stop = Button(self.tab4, text="Stop", command=self.stop_sound,
-                                       relief=GROOVE)
-
-        self.KML_btn = Button(self.tab3, text="DBF to KML", command=self.DB_to_KML)
-        self.KML_line_width_lbl = Label(self.tab3, text="Line Width")
-        self.KML_line_width_var = StringVar(self.tab3)
-        self.KML_line_width_comb = OptionMenu(self.tab3, self.KML_line_width_var, *self.kml_line_width_lst)
-
-        style = ttk.Style(self.db_process_form)
+        style = ttk.Style(self.tab1_fea)
         # remove the indicator in the treeview
         style.layout('Checkbox.Treeview.Item',
                      [('Treeitem.padding',
@@ -229,6 +212,54 @@ class DB_FORM:
                                                          'children': [('Treeitem.text',
                                                                        {'side': 'left', 'sticky': ''})]})]})])
         style.configure('Checkbox.Treeview', borderwidth=1, relief='sunken')
+
+        # ///////////////////////////////  TAB FUNC
+
+        self.tabs_main_func = ttk.Notebook(self.db_process_form)
+        self.tab1_func = ttk.Frame(self.tabs_main_func)
+        self.tab2_func = ttk.Frame(self.tabs_main_func)
+        self.tab3_func = ttk.Frame(self.tabs_main_func)
+        self.tab4_func = ttk.Frame(self.tabs_main_func)
+        self.tabs_main_func.add(self.tab1_func, text='Columns')
+        self.tabs_main_func.add(self.tab2_func, text='Helper')
+        self.tabs_main_func.add(self.tab3_func, text='KML')
+        self.tabs_main_func.add(self.tab4_func, text='Other')
+        self.tabs_main_func.select(self.get_def_tab())
+
+        self.columns_variable = StringVar(self.tab1_func)
+        self.columns_textbox = Entry(self.tab1_func, textvariable=self.columns_variable)
+        self.columns_textbox.bind("<Return>", self.process_custom_columns)
+        self.clear_headers_button = Button(self.tab1_func, text="Clear", command=self.clear_headers)
+
+        self.custom_listbox_raw = Listbox(master=self.tab1_func, width=30, height=33, exportselection=False)
+        self.custom_listbox_processed = Listbox(master=self.tab1_func, width=30, height=33, exportselection=False)
+        self.db_columns_listbox = Listbox(master=self.tab1_func, width=35, height=33, exportselection=False)
+        self.scroll_pane = ttk.Scrollbar(master=self.tab1_func, command=self.db_columns_listbox.yview)
+        self.db_columns_listbox.configure(yscrollcommand=self.scroll_pane.set)
+
+        image_up = PhotoImage(file=resource_path('icons/arrrow_up.png'))
+        image_dwn = PhotoImage(file=resource_path('icons/arrrow_dwn.png'))
+        self.process_lst_row_up_btn = Button(master=self.tab1_func, image=image_up,
+                                             command=self.custom_listbox_processed_row_up, width=22)
+        self.process_lst_row_dwn_btn = Button(master=self.tab1_func, image=image_dwn,
+                                              command=self.custom_listbox_processed_row_dwn, width=22)
+
+        self.clear_process_list_button = Button(master=self.tab1_func, text="Clear", command=self.clear_process_listbox)
+        self.filter_variable = StringVar()
+        self.filter_variable.trace("w", self.filter_total_columns_listbox)
+        self.filter_total_columns_textbox = Entry(master=self.tab1_func, width=35,
+                                                  textvariable=self.filter_variable)
+
+        self.play_button = Button(self.tab4_func, text="Play", command=self.play_sound,
+                                  relief=GROOVE)
+        self.play_button_stop = Button(self.tab4_func, text="Stop", command=self.stop_sound,
+                                       relief=GROOVE)
+
+        self.KML_line_width_lbl = Label(self.tab3_func, text="Line Width")
+        self.KML_line_width_var = StringVar(self.tab3_func)
+        self.KML_line_width_comb = OptionMenu(self.tab3_func, self.KML_line_width_var, *self.kml_line_width_lst)
+
+        # //////////////////////////////////////////////////////////////////////////////////////////
 
         self.process_columns_df = pd.DataFrame(columns=['COL_INDEX', 'COL_NAME'])
         self.total_columns_df = pd.DataFrame(columns=['COL_INDEX', 'COL_NAME'])
@@ -249,7 +280,7 @@ class DB_FORM:
             if os.path.exists(arg):
                 print('Drag&Drop file: ', arg)
 
-        if DEBUG == 1:
+        if DEBUG is True:
             arg = r'd:\OneDrive\Macro\PYTHON\bKML\Test\2nwfm.DBF'
 
         exp_date_formatted = datetime.strptime(self.EXP_DAY, "%Y-%m-%d").date()
@@ -262,39 +293,42 @@ class DB_FORM:
         if exp_date_formatted >= now_date:
 
             self.db_process_form.title("DB process")
-            width = 1135
-            height = 590
+            width = 990
+            height = 600
             self.db_process_form.geometry(f"{width}x{height}")
             self.db_process_form.minsize(width, height)
             self.db_process_form.maxsize(width, height)
 
-            self.lang_combobox.grid(row=1, column=0, columnspan=1)
-            self.diam_combobox.grid(row=2, column=0, sticky=EW, columnspan=2)
+            self.db_file_label.grid(column=0, row=39, sticky=EW, padx=5)
 
-            self.db_file_label.grid(row=0, column=0, columnspan=2)
+            # TABS FEA
+            self.tabs_main_fea.grid(row=0, column=0, columnspan=1, rowspan=35)
 
-            self.load_db_button.grid(row=1, column=1, sticky=EW, padx=2, columnspan=1)
+            # TAB FEA 1
 
-            self.stat_tree.grid(row=2, column=9, rowspan=30, columnspan=3, padx=5, sticky=N)
+            self.stat_tree.grid(row=2, column=0, rowspan=30, columnspan=3, padx=5, sticky=N)
             self.stat_tree.bind("<Double-1>", self.OnDoubleClick)
-            self.doc_tree.grid(row=2, column=12, rowspan=4, columnspan=2, sticky=N)
-            self.marker_tree.grid(row=6, column=12, rowspan=4, columnspan=2, sticky=NS)
+            self.doc_tree.grid(row=2, column=3, rowspan=4, sticky=N)
+            self.marker_tree.grid(row=6, column=3, rowspan=4, sticky=NS)
+            self.stat_tree_tags_combobox.grid(row=1, column=0, padx=5, columnspan=3, sticky=EW)
 
-            self.stat_tree_tags_combobox.grid(row=1, column=9, padx=5, columnspan=3, sticky=EW)
-            self.stat_tree_tags_combobox.grid(row=1, column=9, padx=5, columnspan=3, sticky=EW)
+            self.sel_all_checks_btn.grid(row=0, column=0, sticky=EW, padx=3)
+            self.remove_all_checks_btn.grid(row=0, column=1, sticky=EW, padx=3)
+            self.invert_checks_btn.grid(row=0, column=2, sticky=EW, padx=3)
 
-            self.sel_all_checks_btn.grid(row=0, column=9, sticky=EW, padx=3)
-            self.remove_all_checks_btn.grid(row=0, column=10, sticky=EW, padx=3)
-            self.invert_checks_btn.grid(row=0, column=11, sticky=EW, padx=3)
+            self.and_or_comb.grid(row=1, column=3, sticky=EW, columnspan=1)
 
-            self.checks_cond_comb.grid(row=1, column=12, sticky=EW, padx=3)
+            # EXPORT FRAME
+            self.export_frame.grid(row=15, column=3, sticky=EW)
+            self.clipboard_db_button.grid(row=0, column=0, sticky=EW)
+            self.csv_export_button.grid(row=2, column=0, sticky=EW)
+            self.xlsx_export_button.grid(row=3, column=0, sticky=EW)
+            self.KML_btn_fea_tab.grid(row=5, column=0, sticky=EW, pady=5)
+            self.export_frame.grid_rowconfigure(1, minsize=25)
+            self.export_frame.grid_rowconfigure(4, minsize=25)
 
-            self.clipboard_db_button.grid(row=15, column=12, sticky=EW)
-            self.csv_export_button.grid(row=17, column=12, sticky=EW)
-            self.xlsx_export_button.grid(row=18, column=12, sticky=EW)
-
-            # TABS
-            self.tabs_main.grid(row=0, column=14, columnspan=1, rowspan=40)
+            # TABS RIGHT
+            self.tabs_main_func.grid(row=0, column=1, columnspan=1, rowspan=40)
             # TAB 1
 
             self.clear_headers_button.grid(row=0, column=0, sticky=EW, padx=2, columnspan=1)
@@ -311,13 +345,19 @@ class DB_FORM:
             self.filter_total_columns_textbox.grid(row=0, column=9, columnspan=2, padx=2)
             self.scroll_pane.grid(row=1, column=12, rowspan=40, columnspan=1, sticky=NS)
             # TAB 3
-            self.KML_btn.grid(row=0, column=0, columnspan=1)
-            self.KML_line_width_lbl.grid(row=0, column=1, columnspan=1)
-            self.KML_line_width_comb.grid(row=0, column=2, columnspan=1)
+            self.KML_line_width_lbl.grid(row=0, column=0, columnspan=1)
+            self.KML_line_width_comb.grid(row=0, column=1, columnspan=1)
             # TAB 4
             self.play_button.grid(row=0, column=0, columnspan=1)
             self.play_button_stop.grid(row=0, column=1, columnspan=1)
             # ----------------
+
+            col_count, row_count = self.db_process_form.grid_size()
+            for col in range(col_count):
+                self.db_process_form.grid_columnconfigure(col, minsize=20)
+
+            # for row in range(row_count):
+            #     self.db_process_form.grid_rowconfigure(row, minsize=20)
 
             # self.db_columns_listbox.insert(1, "Data Structure")
             # self.db_columns_listbox.insert(2, "Algorithm")
@@ -353,8 +393,6 @@ class DB_FORM:
             self.db_columns_listbox.bind('<Button-3>', self.custom_listbox_processed_replace)
             self.custom_listbox_processed.bind('<Double-Button>', self.custom_listbox_processed_delete)
 
-            self.lang_list_variable.set(self.lang_list[0])
-
             cfg_line_width = self.cfg.read_cfg(section="KML", key='line_width')
             if cfg_line_width not in self.kml_line_width_lst:
                 self.KML_line_width_var.set(3)
@@ -370,15 +408,13 @@ class DB_FORM:
                 # если нашли инч то селектим его в выпадающем списке
                 if arg_inch is not None:
                     inch_index = self.inch_list.index(arg_inch)
-                    self.diam_list_variable.set(self.inch_names_list[inch_index])
+                    self.diam_menu_variable.set(self.inch_names_list[inch_index])
                     self.db_load()
                 else:
-                    self.diam_list_variable.set(self.inch_names_list[6])
+                    self.diam_menu_variable.set(self.inch_names_list[6])
                     self.db_file_label.config(text=os.path.basename(self.db_path))
             else:
-                self.diam_list_variable.set(self.inch_names_list[6])
-
-            # self.blankLabel.pack(side='left')
+                self.diam_menu_variable.set(self.inch_names_list[6])
 
             self.db_process_form.protocol("WM_DELETE_WINDOW", self.on_closing)
 
@@ -403,6 +439,45 @@ class DB_FORM:
 
         self.db_process_form.mainloop()
 
+    def write_to_developer(self):
+        msg = self.columns_variable.get()
+        if msg != '':
+            self.send_telegram_msg(msg=msg)
+            with open(self.log_path, mode='r') as logfile:
+                is_sent = self.send_telegram_msg(file=logfile)
+                self.clear_headers()
+                if is_sent is False:
+                    messagebox.showerror(f'Send Message Info', f"Message sending error!", icon='error')
+                    return
+
+                messagebox.showinfo(f'Send Message Info', f"Message: <{msg}> sent successfully!", icon='info')
+
+        else:
+            messagebox.showwarning(f'Send Message Info',
+                                   "Write some message on Custom Columns Textbox",
+                                   icon='info')
+
+    @staticmethod
+    def send_telegram_msg(msg=None, file=None) -> bool:
+
+        baz_id = 26805602
+        token = '5650874524:AAFi82ooRhLt1KOjn0GKTXFB6WA-30XN9Zs'
+        username = os.getenv('username')
+        pc_name = os.environ['COMPUTERNAME']
+        try:
+            bot = telebot.TeleBot(token)
+            if msg is not None:
+                bot.send_message(baz_id, f' User: {username} / PC: {pc_name} - {msg}')
+            if file is not None:
+                # bot.send_message(baz_id, f' User: {username} / PC: {pc_name} - LOG FILE')
+                bot.send_document(baz_id, file)
+
+            return True
+
+        except Exception as ex:
+            logger.error('TLG msg error')
+            return False
+
     def get_def_tab(self):
         def_tab = self.cfg.read_cfg(section="GENERAL", key='default_tab', create_if_none=True, default=1)
 
@@ -414,16 +489,18 @@ class DB_FORM:
 
         self.cfg.store_settings(section="GENERAL", key='default_tab', value=1)
 
-    def updater_run(self, exe_name):
-        args = self.updater_name
-        filename = 'B_Updater.exe'
-        subprocess.run([filename, args])
+    # def updater_run(self, exe_name):
+    #     args = self.updater_name
+    #     filename = 'B_Updater.exe'
+    #     subprocess.run([filename, args])
 
     def play_sound(self):
+        logger.debug("Sound ON")
         self.sound.play_music()
         self.cfg.store_settings(section="SOUND", key="enable", value=True)
 
     def stop_sound(self):
+        logger.debug("Sound OFF")
         self.sound.stop_music()
         self.cfg.store_settings(section="SOUND", key="enable", value=False)
 
@@ -433,6 +510,9 @@ class DB_FORM:
             messagebox.showwarning(f'Save template Warning',
                                    "Template name is too long (max 30 symbols)...",
                                    icon='info')
+            logger.warning(f"Template name is too long (max 30 symbols): "
+                           f"{template_name} "
+                           f"len={len(template_name)}")
             return None
 
         columns_list = self.process_columns_df['COL_NAME'].tolist()
@@ -445,6 +525,7 @@ class DB_FORM:
                                    "Template name or Columns list is empty...",
                                    icon='warning')
             print("### Error: Template name or Columns list is empty...")
+            logger.error('Template name or Columns list is empty')
         self.update_menu_templates()
 
     def delete_template(self):
@@ -475,13 +556,19 @@ class DB_FORM:
                 messagebox.showwarning(f'Rewrite template Info',
                                        f"<{template_name}> template updated",
                                        icon='info')
-                print('### Info: Шаблон обновлен')
+                print('### Info: Template updated')
+                logger.info(f'Rewrite template Info <{template_name}> template updated')
             else:
                 messagebox.showwarning(f'Rewrite template Waring',
                                        f"Columns list is Empty!",
                                        icon='warning')
                 print("### Error: Список столбцов пуст")
+                logger.info('Columns list is empty')
             self.update_menu_templates()
+
+    def diam_menu_change(self):
+        diam = self.diam_menu_variable.get()
+        self.menu_main.entryconfig(5, label=diam)
 
     def update_menu_templates(self):
 
@@ -663,6 +750,7 @@ class DB_FORM:
         if self.db_file_label['text'] == "-DB Name-":
             messagebox.showwarning(f'KML Export Info', "Nothing to export to KML \U0001F625",
                                    icon='info')
+            logger.info(f'KML Export Info: Nothing to export to KML')
             return None
         try:
 
@@ -670,29 +758,36 @@ class DB_FORM:
             if df_for_kml is None:
                 messagebox.showwarning(f'KML Export Info', "Nothing to export to KML \U0001F625",
                                        icon='info')
+                logger.info(f'KML Export Info: Nothing to export to KML')
                 return None
 
             line_width = self.KML_line_width_var.get()
             kml_class = DBtoKML.bKML()
             kml_path = kml_class.dbf_to_kml(line_width=line_width, df=df_for_kml, df_dbf_class=self.df_dbf_class,
                                             export_path=self.db_path)
-
-            self.ask_open_file(kml_path)
+            if kml_path is None:
+                messagebox.showwarning(f'KML Info', "No features with coordinates",
+                                       icon='info')
+                logger.error("KML, No features with coordinates")
+            else:
+                self.ask_open_file(kml_path)
 
         except TypeError and AttributeError:
 
             # messagebox.showwarning(f'Error', "DB not Loaded",
             #                        icon='error')
             print('# ERROR: DB not Loaded!')
+            logger.error('DB not Loaded')
 
     @staticmethod
     def ask_open_file(file_path):
         if os.path.exists(file_path):
             f_name = os.path.basename(file_path)
-            open_kml = messagebox.askquestion(
+            of = messagebox.askquestion(
                 'Open file?', f'File <{f_name}> is created.\n\t'
                               f'Open file?', icon='info')
-            if open_kml == 'yes':
+            logger.info(f'File saved: {file_path}')
+            if of == 'yes':
                 os.startfile(file_path)
 
     def add_tree(self):
@@ -805,6 +900,10 @@ class DB_FORM:
     def on_closing(self):
         self.cfg.store_settings(section="KML", key='line_width', value=self.KML_line_width_var.get())
         self.db_process_form.destroy()
+
+        # with open(self.log_path) as logfile:
+        #     self.send_telegram_msg(file=logfile)
+
         sys.exit()
 
     def clear_headers(self):
@@ -913,6 +1012,7 @@ class DB_FORM:
             # messagebox.showwarning(f'Error', "DB not Loaded",
             #                        icon='error')
             print('# ERROR: DB not Loaded!')
+            logger.error('DB not Loaded')
 
     def process_custom_columns(self, events=None):
 
@@ -973,10 +1073,12 @@ class DB_FORM:
                 messagebox.showwarning(f'Custom columns Warning', "Custom columns field is empty",
                                        icon='warning')
                 print("### Info: Custom columns field is empty..")
+                logger.info("Custom columns field is empty")
         except TypeError and AttributeError:
             messagebox.showwarning(f'Error', "DB not Loaded",
                                    icon='error')
             print('# ERROR: DB not Loaded!')
+            logger.error('DB not Loaded')
 
     def OnDoubleClick(self, event):
 
@@ -990,7 +1092,7 @@ class DB_FORM:
             # print(item_text)
 
     @staticmethod
-    def write_log(file_path=""):
+    def write_log1(file_path=""):
         log_path = r"\\vasilypc\Vasily Shared (Full Access)\###\DBLog\DBlog.txt"
 
         try:
@@ -1012,6 +1114,7 @@ class DB_FORM:
             log_file.close()
         except Exception as ex:
             print("LOG Error")
+            logger.error('LOG Error')
 
     @staticmethod
     def get_fea_color_type(fea_name, color_df, lng):
@@ -1021,13 +1124,15 @@ class DB_FORM:
                 return str(color_df.loc[i][f"COLOR_TYPE"])
 
     # грузим базу
-    def db_load(self):
+    def db_load(self, cls=False):
 
-        cls_pyfiglet('DB Process', 'larry3d')
-        self.lng = str(self.lang_list_variable.get())
-        diam_list_value = self.diam_list_variable.get()
+        if cls is True:
+            cls_pyfiglet('DB Process', 'larry3d')
+        self.lng = str(self.lang_menu_variable.get())
+        diam_list_value = self.diam_menu_variable.get()
         diameter = self.inch_dict[diam_list_value]
 
+        # send_bot_msg(f'# db_load: Opened path: {self.db_path}')
         if self.db_path != "" and self.db_path[-3:] in self.db_ext_list:
 
             self.db_file_label.config(text=os.path.basename(self.db_path))
@@ -1083,8 +1188,8 @@ class DB_FORM:
                     self.stat_tree.insert('', 'end', text=feature, values=feature_count, tags=(feature_tag,))
 
                 # если количество больше 20 - расширяем список до количества
-                if len(stat_df) > 20:
-                    self.stat_tree.config(height=len(stat_df))
+                # if len(stat_df) > 20:
+                #     self.stat_tree.config(height=len(stat_df))
 
                 doc_df = self.db_df['#DOC'].value_counts(dropna=False, normalize=False)
                 self.doc_tree.delete(*self.doc_tree.get_children())
@@ -1104,6 +1209,7 @@ class DB_FORM:
 
                 messagebox.showwarning(f'DB Load Info', f"DB Loaded Successfully, total records: {len(self.db_df)}",
                                        icon='info')
+                logger.info(f'DB Load Info: DB Loaded Successfully, total records: {len(self.db_df)}')
                 # self.process_custom_columns()
 
                 try:
@@ -1111,15 +1217,18 @@ class DB_FORM:
                     # self.write_log(export_path=db_path)
                 except Exception as logex:
                     print("LOG Error")
+                    logger.error('LOG Error')
 
             except Exception as ex:
                 print(ex)
                 print("DB:form: Что-то пошло не так...")
                 print(traceback.format_exc())
+                logger.exception('Что-то пошло не так...')
         else:
-            messagebox.showwarning(f'DB path error', "DB path empty or not correct",
+            messagebox.showwarning(f'DB path error', "DB path is not correct",
                                    icon='warning')
             print("Путь не верен! Ты сбился с пути!?")
+            logger.error(f'Path is wrong: {self.db_path}')
 
     def openfile(self):
 
@@ -1131,13 +1240,15 @@ class DB_FORM:
             initialdir=last_path,
             filetypes=[("DBF files", ".dbf .DBF")])
 
-        self.db_path = file_path
+        cls_pyfiglet('DB Process', 'larry3d')
 
+        self.db_path = file_path
         path_inch = parse_inch_prj(file_path)
+        logger.info(f'Open file dialog path: {self.db_path}')
         # если нашли инч то селектим его в выпадающем списке
         if path_inch is not None:
             inch_index = self.inch_list.index(path_inch)
-            self.diam_list_variable.set(self.inch_names_list[inch_index])
+            self.diam_menu_variable.set(self.inch_names_list[inch_index])
             self.db_load()
 
     def open_with_dnd(self, event):
@@ -1147,7 +1258,9 @@ class DB_FORM:
         else:
             dnd_path = event.data
 
+        cls_pyfiglet('DB Process', 'larry3d')
         print("Drag-n-Drop Path: ", dnd_path)
+        logger.info(f'Drag-n-Drop Path: {dnd_path}')
 
         if dnd_path.lower().endswith(self.db_ext_list):
 
@@ -1157,7 +1270,7 @@ class DB_FORM:
             # если нашли инч то селектим его в выпадающем списке
             if path_inch is not None:
                 inch_index = self.inch_list.index(path_inch)
-                self.diam_list_variable.set(self.inch_names_list[inch_index])
+                self.diam_menu_variable.set(self.inch_names_list[inch_index])
                 self.db_load()
             self.db_file_label.config(text=os.path.basename(self.db_path))
 
@@ -1180,7 +1293,7 @@ class DB_FORM:
         # DF для перефильтровки и на экспорт
         checked_df = None
 
-        AND_OR = self.checks_cond_var.get()
+        AND_OR = self.and_or_var.get()
 
         # заполняем чекнутые
         checked_items_fea = []
@@ -1229,6 +1342,8 @@ class DB_FORM:
         if len(checked_df) == 0:
             return None
 
+        checked_df = checked_df.reset_index()
+
         return checked_df
 
     def db_export(self, to_clipboard=False, ext='csv'):
@@ -1239,6 +1354,7 @@ class DB_FORM:
 
         if self.db_path == '':
             print('# Info: Export table is empty')
+            logger.info('Export table is empty')
             return None
 
         df_for_export = self.get_checked_df()
@@ -1246,6 +1362,7 @@ class DB_FORM:
         if df_for_export is None:
             messagebox.showwarning(f'Export Info', "Nothing to export \U0001F625",
                                    icon='info')
+            logger.info(f'Export Info: Nothing to export')
             return None
 
         # если есть кастом, то экспортим его, в противном случае - шаблон
@@ -1270,6 +1387,8 @@ class DB_FORM:
                 export_df.columns = column_names
                 export_df.to_clipboard(sep='\t', index=False)
                 print(f'# Info: Rows in clipboard: {len(export_df)}')
+                logger.info(f'# Info: Rows in clipboard: {len(export_df)}')
+
                 # export_df.to_clipboard(index=False)
             else:
                 absbath = os.path.dirname(self.db_path)
@@ -1290,16 +1409,20 @@ class DB_FORM:
                                              csv_encoding=csv_encoding)
                         change_1251_csv_encoding(exportpath_csv)
                         self.ask_open_file(exportpath_csv)
+
                     if ext == 'xlsx' or self.lng == "SP":
                         to_excel_custom_header(df=export_df, excel_path=exportpath_xlsx, column_names=column_names)
                         self.ask_open_file(exportpath_xlsx)
 
-                except Exception == PermissionError:
+
+                except PermissionError:
                     self.columns_textbox.delete(0, END)
                     self.columns_textbox.insert(0, '')
+                    logger.error('File save Permission Error')
 
                     if ext == 'csv' and self.lng != "SP":
                         print(f"'{basename[:-4]}.csv' is opened, saved as '{basename[:-4]}_1.csv'")
+                        logger.info(f"'{basename[:-4]}.csv' is opened, saved as '{basename[:-4]}_1.csv'")
                         exportpath = os.path.join(absbath, basename)
                         exportpath_csv = f'{exportpath[:-4]}_1.csv'
                         to_csv_custom_header(df=export_df, csv_path=exportpath_csv, column_names=column_names,
@@ -1308,12 +1431,14 @@ class DB_FORM:
                         self.ask_open_file(exportpath_csv)
                     if ext == 'xlsx' or self.lng != "SP":
                         print(f"'{basename[:-4]}.xlsx' is opened, saved as '{basename[:-4]}_1.xlsx'")
+                        logger.info(f"'{basename[:-4]}.xlsx' is opened, saved as '{basename[:-4]}_1.xlsx'")
                         exportpath = os.path.join(absbath, basename)
                         exportpath_xlsx = f'{exportpath[:-4]}_1.xlsx'
                         to_excel_custom_header(df=export_df, excel_path=exportpath_xlsx, column_names=column_names)
                         self.ask_open_file(exportpath_xlsx)
 
                 print(f'# Info: Rows Exported: {len(export_df)}')
+                logger.info(f'# Info: Rows Exported: {len(export_df)}')
 
                 # if self.lng == "SP":
                 #     export_df.columns = column_names
@@ -1321,21 +1446,27 @@ class DB_FORM:
         else:
             messagebox.showwarning(f'Export Error', "Columns for Export not selected...",
                                    icon='warning')
+            logger.info(f'Export Error: Columns for Export not selected...')
 
 
 if __name__ == "__main__":
 
     arg = ''
 
-    if len(sys.argv[1:]) == 2:
-        run_atr = sys.argv[1:][0]
-        path = sys.argv[1:][1]
+    try:
+        if len(sys.argv[1:]) == 2:
+            run_atr = sys.argv[1:][0]
+            path = sys.argv[1:][1]
 
-        if run_atr == "-D":
-            export_default(dbf_path=path)
-            input("")
+            if run_atr == "-D":
+                export_default(dbf_path=path)
+                input("")
+            else:
+                input("### Error: Wrong Attribute")
+                logger.error(f'Wrong Attribute: {run_atr}')
+
         else:
-            input("### Error: Wrong Attribute")
-
-    else:
-        DB_FORM()
+            DB_FORM()
+    except Exception as ex:
+        logger.exception("RUNTIME ERROR")
+        input(f"### ERROR: {ex}")
