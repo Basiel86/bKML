@@ -155,7 +155,7 @@ class df_DBF():
 
             if 'F' not in self.df_dbf.columns:
                 print('### WARNING: DB has not Proper Format, please run DBColumns First!!!')
-                logger.warning('### WARNING: DB has not Proper Format, please run DBColumns First!!!')
+                logger.warning('DB has not Proper Format, please run DBColumns First!!!')
 
             # переименовываем столбцы
             for i, row in self.df_struct.iterrows():

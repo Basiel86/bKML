@@ -13,7 +13,10 @@ from columnsCountValSort import columns_count_val_sort, load_columns_stat_dict
 from parse_templates import *
 from play_sound import PlaySound
 from parse_cfg import CFG
-from TkinterDnD2 import *
+
+# python -m pip install tkinterdnd2
+from TkinterDnD2 import TkinterDnD, DND_FILES
+#from TkinterDnD2 import *
 import DBtoKML
 from other_functions import cls_pyfiglet
 import logging.handlers
@@ -33,7 +36,10 @@ class DB_FORM:
 
     def __init__(self):
 
-        self.EXP_DAY = '2022-10-22'
+        self.EXP_DAY = '2023-06-12'
+        exp_date_formatted = datetime.strptime(self.EXP_DAY, "%Y-%m-%d").date()
+        now_date = date.today()
+        days_left = exp_date_formatted - now_date
 
         cls_pyfiglet('DB Process', 'larry3d')
         self.cfg = CFG('DB Process')
@@ -92,185 +98,208 @@ class DB_FORM:
         # self.diam_list = [4, 4.5, 5.563, 6.625, 8.625, 10.75, 12.75, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38,
         #                   40, 42, 44, 46, 48, 52, 56]
 
-        index_cfg_path = self.cfg.read_cfg(section="PATHS", key="index_custom", create_if_none=True)
-        struct_cfg_path = self.cfg.read_cfg(section="PATHS", key="struct_custom", create_if_none=True)
-        index_remote_path = self.cfg.read_cfg(section="PATHS", key="index_share", create_if_none=True,
-                                              default=r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\DBF_INDEX.xlsx')
-        struct_remote_path = self.cfg.read_cfg(section="PATHS", key="struct_share", create_if_none=True,
-                                               default=r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\STRUCT.xlsx')
-
-        local = self.cfg.read_cfg(section="PATHS", key="local", create_if_none=True, default=True)
-        self.df_dbf_class = df_DBF(index_remote_path=index_remote_path,
-                                   index_path=index_cfg_path,
-                                   struct_remote_path=struct_remote_path,
-                                   struct_path=struct_cfg_path,
-                                   local=local)
-        self.db_df = pd.DataFrame
-
         self.db_process_form = TkinterDnD.Tk()
 
         self.db_process_form.iconbitmap(resource_path('icons/DBF_icon.ico'))
         self.db_process_form.drop_target_register(DND_FILES)
         self.db_process_form.dnd_bind('<<Drop>>', self.open_with_dnd)
 
-        self.menu_main = Menu(self.db_process_form)
-        self.db_process_form.config(menu=self.menu_main)
+        if exp_date_formatted >= now_date:
 
-        file_menu = Menu(self.menu_main, tearoff=0)
-        file_menu.add_command(label="Open...", command=self.openfile)
-        file_menu.add_separator()
-        file_menu.add_command(label="Load DB...", command=lambda: self.db_load(cls=True))
-        file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=self.on_closing)
-        self.menu_main.add_cascade(label="File",
-                                   menu=file_menu)
+            index_cfg_path = self.cfg.read_cfg(section="PATHS", key="index_custom", create_if_none=True)
+            struct_cfg_path = self.cfg.read_cfg(section="PATHS", key="struct_custom", create_if_none=True)
+            index_remote_path = self.cfg.read_cfg(section="PATHS", key="index_share", create_if_none=True,
+                                                  default=r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\DBF_INDEX.xlsx')
+            struct_remote_path = self.cfg.read_cfg(section="PATHS", key="struct_share", create_if_none=True,
+                                                   default=r'\\vasilypc\Vasily Shared (Read Only)\_Templates\PT\IDs\STRUCT.xlsx')
 
-        # groove, raised, ridge, solid, or sunken
-        self.db_file_label = Label(self.db_process_form, text="-DB Name-", font=("Verdana", 12),
-                                   justify='center', foreground='red', relief='groove', padx=5, pady=3)
+            local = self.cfg.read_cfg(section="PATHS", key="local", create_if_none=True, default=True)
+            self.df_dbf_class = df_DBF(index_remote_path=index_remote_path,
+                                       index_path=index_cfg_path,
+                                       struct_remote_path=struct_remote_path,
+                                       struct_path=struct_cfg_path,
+                                       local=local)
+            self.db_df = pd.DataFrame
 
-        self.template_menu = Menu(self.menu_main, tearoff=0)
-        self.templates_radio_variable = StringVar()
-        self.update_menu_templates()
-        self.menu_main.add_cascade(label="Templates",
-                                   menu=self.template_menu)
+            self.menu_main = Menu(self.db_process_form)
+            self.db_process_form.config(menu=self.menu_main)
 
-        others_menu = Menu(self.menu_main, tearoff=0)
-        others_menu.add_command(label="Open Config Folder", command=parse_templates.open_templates_folder)
-        others_menu.add_command(label="Open Log", command=lambda: os.startfile(self.log_path))
-        others_menu.add_command(label="Write Developer MSG", command=self.write_to_developer)
-        others_menu.add_command(label="Save Tab Position",
-                                command=lambda: self.cfg.store_settings('GENERAL', 'default_tab',
-                                                                        self.tabs_main_func.index(
-                                                                            self.tabs_main_func.select()) + 1))
-        self.menu_main.add_cascade(label="Configs", menu=others_menu)
+            file_menu = Menu(self.menu_main, tearoff=0)
+            file_menu.add_command(label="Open...", command=self.openfile)
+            file_menu.add_separator()
+            file_menu.add_command(label="Load DB...", command=lambda: self.db_load(cls=True))
+            file_menu.add_separator()
+            file_menu.add_command(label="Exit", command=self.on_closing)
+            self.menu_main.add_cascade(label="File",
+                                       menu=file_menu)
 
-        lang_menu = Menu(self.menu_main, tearoff=0)
-        self.lang_menu_variable = StringVar()
-        self.lang_menu_variable.set(self.lang_list[0])
-        for lang in self.lang_list:
-            lang_menu.add_radiobutton(label=lang, var=self.lang_menu_variable)
-        self.menu_main.add_cascade(label="Language",
-                                   menu=lang_menu)
+            # groove, raised, ridge, solid, or sunken
+            self.db_file_label = Label(self.db_process_form, text="-DB Name-", font=("Verdana", 12),
+                                       justify='center', foreground='red', relief='groove', padx=5, pady=3)
 
-        diam_menu = Menu(self.menu_main, tearoff=0)
-        self.diam_menu_variable = StringVar()
-        self.diam_menu_variable.trace('w', lambda *args: self.diam_menu_change())
+            self.template_menu = Menu(self.menu_main, tearoff=0)
+            self.templates_radio_variable = StringVar()
+            self.update_menu_templates()
+            self.menu_main.add_cascade(label="Templates",
+                                       menu=self.template_menu)
 
-        for inch in self.inch_names_list:
-            diam_menu.add_radiobutton(label=inch, var=self.diam_menu_variable, command=self.diam_menu_change)
-        self.menu_main.add_cascade(label="Diameter", menu=diam_menu)
-        self.diam_menu_change()
+            others_menu = Menu(self.menu_main, tearoff=0)
+            others_menu.add_command(label="Open Config Folder", command=parse_templates.open_templates_folder)
+            others_menu.add_command(label="Open Log", command=lambda: os.startfile(self.log_path))
+            others_menu.add_command(label="Write Developer MSG", command=self.write_to_developer)
+            others_menu.add_command(label="Save Tab Position",
+                                    command=lambda: self.cfg.store_settings('GENERAL', 'default_tab',
+                                                                            self.tabs_main_func.index(
+                                                                                self.tabs_main_func.select()) + 1))
+            self.menu_main.add_cascade(label="Configs", menu=others_menu)
 
-        self.templates_list = get_templates_list()
+            lang_menu = Menu(self.menu_main, tearoff=0)
+            self.lang_menu_variable = StringVar()
+            self.lang_menu_variable.set(self.lang_list[0])
+            for lang in self.lang_list:
+                lang_menu.add_radiobutton(label=lang, var=self.lang_menu_variable)
+            self.menu_main.add_cascade(label="Language",
+                                       menu=lang_menu)
 
-        # ///////////////////////////////  TAB FEA
+            diam_menu = Menu(self.menu_main, tearoff=0)
+            self.diam_menu_variable = StringVar()
+            self.diam_menu_variable.trace('w', lambda *args: self.diam_menu_change())
 
-        self.tabs_main_fea = ttk.Notebook(self.db_process_form)
-        self.tab1_fea = ttk.Frame(self.tabs_main_fea)
-        self.tabs_main_fea.add(self.tab1_fea, text='Fea')
+            for inch in self.inch_names_list:
+                diam_menu.add_radiobutton(label=inch, var=self.diam_menu_variable, command=self.diam_menu_change)
+            self.menu_main.add_cascade(label="Diameter", menu=diam_menu)
+            self.diam_menu_change()
 
-        self.export_frame = ttk.Labelframe(master=self.tab1_fea, text='Export')  # , width=50, height=50
-        self.clipboard_db_button = Button(self.export_frame, text="to Clip", width=10,
-                                          command=lambda: self.db_export(to_clipboard=True))
-        self.csv_export_button = Button(self.export_frame, text="to CSV", width=10,
-                                        command=lambda: self.db_export(ext='csv'))
-        self.xlsx_export_button = Button(self.export_frame, text="to XLSX", width=10,
-                                         command=lambda: self.db_export(ext='xlsx'))
-        self.KML_btn_fea_tab = Button(self.export_frame, text="to KML", command=self.DB_to_KML)
+            self.templates_list = get_templates_list()
 
-        self.and_or_var = StringVar(self.tab1_fea)
-        self.and_or_comb = OptionMenu(self.tab1_fea, self.and_or_var, *('AND', 'OR'))
-        self.and_or_var.set('AND')
+            # ///////////////////////////////  TAB FEA
 
-        # высота в строках
-        self.stat_tree = CheckboxTreeview(self.tab1_fea, show='tree', column="c1", height=24)
-        self.stat_tree.column("# 1", anchor='center', stretch='NO', width=60)
+            self.tabs_main_fea = ttk.Notebook(self.db_process_form)
+            self.tab1_fea = ttk.Frame(self.tabs_main_fea)
+            self.tabs_main_fea.add(self.tab1_fea, text='Fea')
 
-        self.stat_tree_tags_variable = StringVar(self.tab1_fea)
-        self.stat_tree_tags_variable.trace(mode='w', callback=self.stat_tree_tags_option_change)
-        self.stat_tree_tags_combobox = OptionMenu(self.tab1_fea, self.stat_tree_tags_variable,
-                                                  self.stat_tree_tags_list)
-        self.sel_all_checks_btn = Button(self.tab1_fea, text="Select All", command=self.select_all_checks)
-        self.remove_all_checks_btn = Button(self.tab1_fea, text="Clear All", command=self.remove_all_checks)
-        self.invert_checks_btn = Button(self.tab1_fea, text="Invert", command=self.invert_checks)
+            self.export_frame = ttk.Labelframe(master=self.tab1_fea, text='Export')  # , width=50, height=50
+            self.clipboard_db_button = Button(self.export_frame, text="to Clip", width=10,
+                                              command=lambda: self.db_export(to_clipboard=True))
+            self.csv_export_button = Button(self.export_frame, text="to CSV", width=10,
+                                            command=lambda: self.db_export(ext='csv'))
+            self.xlsx_export_button = Button(self.export_frame, text="to XLSX", width=10,
+                                             command=lambda: self.db_export(ext='xlsx'))
+            self.KML_btn_fea_tab = Button(self.export_frame, text="to KML", command=self.DB_to_KML)
 
-        self.doc_tree = CheckboxTreeview(self.tab1_fea, show='tree', column="c1", height=5)
-        self.doc_tree.column("# 0", anchor='center', stretch='YES', width=30)
-        self.doc_tree.column("# 1", anchor='center', stretch='NO', width=60)
+            self.and_or_var = StringVar(self.tab1_fea)
+            self.and_or_comb = OptionMenu(self.tab1_fea, self.and_or_var, *('AND', 'OR'))
+            self.and_or_var.set('AND')
 
-        self.marker_tree = CheckboxTreeview(self.tab1_fea, show='tree', column="c1", height=3)
-        self.marker_tree.column("# 0", anchor='center', stretch='YES', width=30)
-        self.marker_tree.column("# 1", anchor='center', stretch='NO', width=60)
+            # высота в строках
+            self.stat_tree = CheckboxTreeview(self.tab1_fea, show='tree', column="c1", height=24)
+            self.stat_tree.column("# 1", anchor='center', stretch='NO', width=60)
 
-        style = ttk.Style(self.tab1_fea)
-        # remove the indicator in the treeview
-        style.layout('Checkbox.Treeview.Item',
-                     [('Treeitem.padding',
-                       {'sticky': 'nswe',
-                        'children': [('Treeitem.image', {'side': 'left', 'sticky': ''}),
-                                     ('Treeitem.focus', {'side': 'left', 'sticky': '',
-                                                         'children': [('Treeitem.text',
-                                                                       {'side': 'left', 'sticky': ''})]})]})])
-        style.configure('Checkbox.Treeview', borderwidth=1, relief='sunken')
+            self.stat_tree_tags_variable = StringVar(self.tab1_fea)
+            self.stat_tree_tags_variable.trace(mode='w', callback=self.stat_tree_tags_option_change)
+            self.stat_tree_tags_combobox = OptionMenu(self.tab1_fea, self.stat_tree_tags_variable,
+                                                      self.stat_tree_tags_list)
+            self.sel_all_checks_btn = Button(self.tab1_fea, text="Select All", command=self.select_all_checks)
+            self.remove_all_checks_btn = Button(self.tab1_fea, text="Clear All", command=self.remove_all_checks)
+            self.invert_checks_btn = Button(self.tab1_fea, text="Invert", command=self.invert_checks)
 
-        # ///////////////////////////////  TAB FUNC
+            self.doc_tree = CheckboxTreeview(self.tab1_fea, show='tree', column="c1", height=5)
+            self.doc_tree.column("# 0", anchor='center', stretch='YES', width=30)
+            self.doc_tree.column("# 1", anchor='center', stretch='NO', width=60)
 
-        self.tabs_main_func = ttk.Notebook(self.db_process_form)
-        self.tab1_func = ttk.Frame(self.tabs_main_func)
-        self.tab2_func = ttk.Frame(self.tabs_main_func)
-        self.tab3_func = ttk.Frame(self.tabs_main_func)
-        self.tab4_func = ttk.Frame(self.tabs_main_func)
-        self.tabs_main_func.add(self.tab1_func, text='Columns')
-        self.tabs_main_func.add(self.tab2_func, text='Helper')
-        self.tabs_main_func.add(self.tab3_func, text='KML')
-        self.tabs_main_func.add(self.tab4_func, text='Other')
-        self.tabs_main_func.select(self.get_def_tab())
+            self.marker_tree = CheckboxTreeview(self.tab1_fea, show='tree', column="c1", height=3)
+            self.marker_tree.column("# 0", anchor='center', stretch='YES', width=30)
+            self.marker_tree.column("# 1", anchor='center', stretch='NO', width=60)
 
-        self.columns_variable = StringVar(self.tab1_func)
-        self.columns_textbox = Entry(self.tab1_func, textvariable=self.columns_variable)
-        self.columns_textbox.bind("<Return>", self.process_custom_columns)
-        self.clear_headers_button = Button(self.tab1_func, text="Clear", command=self.clear_headers)
+            style = ttk.Style(self.tab1_fea)
+            # remove the indicator in the treeview
+            style.layout('Checkbox.Treeview.Item',
+                         [('Treeitem.padding',
+                           {'sticky': 'nswe',
+                            'children': [('Treeitem.image', {'side': 'left', 'sticky': ''}),
+                                         ('Treeitem.focus', {'side': 'left', 'sticky': '',
+                                                             'children': [('Treeitem.text',
+                                                                           {'side': 'left', 'sticky': ''})]})]})])
+            style.configure('Checkbox.Treeview', borderwidth=1, relief='sunken')
 
-        self.custom_listbox_raw = Listbox(master=self.tab1_func, width=30, height=33, exportselection=False)
-        self.custom_listbox_processed = Listbox(master=self.tab1_func, width=30, height=33, exportselection=False)
-        self.db_columns_listbox = Listbox(master=self.tab1_func, width=35, height=33, exportselection=False)
-        self.scroll_pane = ttk.Scrollbar(master=self.tab1_func, command=self.db_columns_listbox.yview)
-        self.db_columns_listbox.configure(yscrollcommand=self.scroll_pane.set)
+            # ///////////////////////////////  TAB FUNC
 
-        image_up = PhotoImage(file=resource_path('icons/arrrow_up.png'))
-        image_dwn = PhotoImage(file=resource_path('icons/arrrow_dwn.png'))
-        self.process_lst_row_up_btn = Button(master=self.tab1_func, image=image_up,
-                                             command=self.custom_listbox_processed_row_up, width=22)
-        self.process_lst_row_dwn_btn = Button(master=self.tab1_func, image=image_dwn,
-                                              command=self.custom_listbox_processed_row_dwn, width=22)
+            self.tabs_main_func = ttk.Notebook(self.db_process_form)
+            self.tab1_func = ttk.Frame(self.tabs_main_func)
+            self.tab2_func = ttk.Frame(self.tabs_main_func)
+            self.tab3_func = ttk.Frame(self.tabs_main_func)
+            self.tab4_func = ttk.Frame(self.tabs_main_func)
+            self.tabs_main_func.add(self.tab1_func, text='Columns')
+            self.tabs_main_func.add(self.tab2_func, text='Helper')
+            self.tabs_main_func.add(self.tab3_func, text='KML')
+            self.tabs_main_func.add(self.tab4_func, text='Other')
+            self.tabs_main_func.select(self.get_def_tab())
 
-        self.clear_process_list_button = Button(master=self.tab1_func, text="Clear", command=self.clear_process_listbox)
-        self.filter_variable = StringVar()
-        self.filter_variable.trace("w", self.filter_total_columns_listbox)
-        self.filter_total_columns_textbox = Entry(master=self.tab1_func, width=35,
-                                                  textvariable=self.filter_variable)
+            self.columns_variable = StringVar(self.tab1_func)
+            self.columns_textbox = Entry(self.tab1_func, textvariable=self.columns_variable)
+            self.columns_textbox.bind("<Return>", self.process_custom_columns)
+            self.clear_headers_button = Button(self.tab1_func, text="Clear", command=self.clear_headers)
 
-        self.play_button = Button(self.tab4_func, text="Play", command=self.play_sound,
-                                  relief=GROOVE)
-        self.play_button_stop = Button(self.tab4_func, text="Stop", command=self.stop_sound,
-                                       relief=GROOVE)
+            self.custom_listbox_raw = Listbox(master=self.tab1_func, width=30, height=33, exportselection=False)
+            self.custom_listbox_processed = Listbox(master=self.tab1_func, width=30, height=33, exportselection=False)
+            self.db_columns_listbox = Listbox(master=self.tab1_func, width=35, height=33, exportselection=False)
+            self.scroll_pane = ttk.Scrollbar(master=self.tab1_func, command=self.db_columns_listbox.yview)
+            self.db_columns_listbox.configure(yscrollcommand=self.scroll_pane.set)
 
-        self.KML_line_width_lbl = Label(self.tab3_func, text="Line Width")
-        self.KML_line_width_var = StringVar(self.tab3_func)
-        self.KML_line_width_comb = OptionMenu(self.tab3_func, self.KML_line_width_var, *self.kml_line_width_lst)
+            image_up = PhotoImage(file=resource_path('icons/arrrow_up.png'))
+            image_dwn = PhotoImage(file=resource_path('icons/arrrow_dwn.png'))
+            self.process_lst_row_up_btn = Button(master=self.tab1_func, image=image_up,
+                                                 command=self.custom_listbox_processed_row_up, width=22)
+            self.process_lst_row_dwn_btn = Button(master=self.tab1_func, image=image_dwn,
+                                                  command=self.custom_listbox_processed_row_dwn, width=22)
 
-        # //////////////////////////////////////////////////////////////////////////////////////////
+            self.clear_process_list_button = Button(master=self.tab1_func, text="Clear", command=self.clear_process_listbox)
+            self.filter_variable = StringVar()
+            self.filter_variable.trace("w", self.filter_total_columns_listbox)
+            self.filter_total_columns_textbox = Entry(master=self.tab1_func, width=35,
+                                                      textvariable=self.filter_variable)
 
-        self.process_columns_df = pd.DataFrame(columns=['COL_INDEX', 'COL_NAME'])
-        self.total_columns_df = pd.DataFrame(columns=['COL_INDEX', 'COL_NAME'])
-        self.total_columns_filter_backup_df = pd.DataFrame(columns=['COL_INDEX', 'COL_NAME'])
+            self.play_button = Button(self.tab4_func, text="Play", command=self.play_sound,
+                                      relief=GROOVE)
+            self.play_button_stop = Button(self.tab4_func, text="Stop", command=self.stop_sound,
+                                           relief=GROOVE)
 
-        # Инициализация Базы
-        self.lng = ''
-        # self.df_dbf_class = df_DBF()
+            self.KML_line_width_lbl = Label(self.tab3_func, text="Line Width")
+            self.KML_line_width_var = StringVar(self.tab3_func)
+            self.KML_line_width_comb = OptionMenu(self.tab3_func, self.KML_line_width_var, *self.kml_line_width_lst)
 
-        self.form_init()
+            # //////////////////////////////////////////////////////////////////////////////////////////
+
+            self.process_columns_df = pd.DataFrame(columns=['COL_INDEX', 'COL_NAME'])
+            self.total_columns_df = pd.DataFrame(columns=['COL_INDEX', 'COL_NAME'])
+            self.total_columns_filter_backup_df = pd.DataFrame(columns=['COL_INDEX', 'COL_NAME'])
+
+            # Инициализация Базы
+            self.lng = ''
+            # self.df_dbf_class = df_DBF()
+
+            self.form_init()
+
+        else:
+            self.db_process_form.geometry("1900x850")
+            self.db_process_form.title('EXPIRED')
+            self.db_process_form.geometry("300x60")
+            self.db_process_form.resizable(False, False)
+            # self.db_process_form.minsize(300, 60)
+            # self.db_process_form.maxsize(300, 60)
+
+
+            exp_label = Label(master=self.db_process_form, text="Your version has expired", fg='red', font=15)
+            exp_label.pack()
+            exp_label2 = Label(master=self.db_process_form, text="Please update", fg='red', font=15)
+            exp_label2.pack()
+
+            # def on_closing():
+            #     self.db_process_form.destroy()
+            #     sys.exit()
+            #
+            # self.db_process_form.protocol("WM_DELETE_WINDOW", on_closing)
+            self.db_process_form.mainloop()
 
     def form_init(self):
 
@@ -282,163 +311,139 @@ class DB_FORM:
                 print('Drag&Drop file: ', arg)
 
         if DEBUG is True:
-            arg = r'd:\OneDrive\Macro\PYTHON\bKML\Test\2nwfm.DBF'
-
-        exp_date_formatted = datetime.strptime(self.EXP_DAY, "%Y-%m-%d").date()
-        now_date = date.today()
-        days_left = exp_date_formatted - now_date
+            arg = r'd:\###WORK\NCTO\Газпромнефть Ямал\NQK 12 inch К-15 - т.вр.K-17, 2.916 км\NQK 12 inch К-15 - т.вр.K-17, 2.916 км\Report\FR\Database\1NQKM.dbf'
 
         ico_abs_path = resource_path('icons\DBF_icon.ico')
         self.db_process_form.wm_iconbitmap(ico_abs_path)
 
-        if exp_date_formatted >= now_date:
+        self.db_process_form.title("DB process")
+        width = 990
+        height = 600
+        self.db_process_form.geometry(f"{width}x{height}")
+        self.db_process_form.minsize(width, height)
+        self.db_process_form.maxsize(width, height)
 
-            self.db_process_form.title("DB process")
-            width = 990
-            height = 600
-            self.db_process_form.geometry(f"{width}x{height}")
-            self.db_process_form.minsize(width, height)
-            self.db_process_form.maxsize(width, height)
+        self.db_file_label.grid(column=0, row=39, sticky=EW, padx=5)
 
-            self.db_file_label.grid(column=0, row=39, sticky=EW, padx=5)
+        # TABS FEA
+        self.tabs_main_fea.grid(row=0, column=0, columnspan=1, rowspan=35)
 
-            # TABS FEA
-            self.tabs_main_fea.grid(row=0, column=0, columnspan=1, rowspan=35)
+        # TAB FEA 1
 
-            # TAB FEA 1
+        self.stat_tree.grid(row=2, column=0, rowspan=30, columnspan=3, padx=5, sticky=N)
+        self.stat_tree.bind("<Double-1>", self.OnDoubleClick)
+        self.doc_tree.grid(row=2, column=3, rowspan=4, sticky=N)
+        self.marker_tree.grid(row=6, column=3, rowspan=4, sticky=NS)
+        self.stat_tree_tags_combobox.grid(row=1, column=0, padx=5, columnspan=3, sticky=EW)
 
-            self.stat_tree.grid(row=2, column=0, rowspan=30, columnspan=3, padx=5, sticky=N)
-            self.stat_tree.bind("<Double-1>", self.OnDoubleClick)
-            self.doc_tree.grid(row=2, column=3, rowspan=4, sticky=N)
-            self.marker_tree.grid(row=6, column=3, rowspan=4, sticky=NS)
-            self.stat_tree_tags_combobox.grid(row=1, column=0, padx=5, columnspan=3, sticky=EW)
+        self.sel_all_checks_btn.grid(row=0, column=0, sticky=EW, padx=3)
+        self.remove_all_checks_btn.grid(row=0, column=1, sticky=EW, padx=3)
+        self.invert_checks_btn.grid(row=0, column=2, sticky=EW, padx=3)
 
-            self.sel_all_checks_btn.grid(row=0, column=0, sticky=EW, padx=3)
-            self.remove_all_checks_btn.grid(row=0, column=1, sticky=EW, padx=3)
-            self.invert_checks_btn.grid(row=0, column=2, sticky=EW, padx=3)
+        self.and_or_comb.grid(row=1, column=3, sticky=EW, columnspan=1)
 
-            self.and_or_comb.grid(row=1, column=3, sticky=EW, columnspan=1)
+        # EXPORT FRAME
+        self.export_frame.grid(row=15, column=3, sticky=EW)
+        self.clipboard_db_button.grid(row=0, column=0, sticky=EW)
+        self.csv_export_button.grid(row=2, column=0, sticky=EW)
+        self.xlsx_export_button.grid(row=3, column=0, sticky=EW)
+        self.KML_btn_fea_tab.grid(row=5, column=0, sticky=EW, pady=5)
+        self.export_frame.grid_rowconfigure(1, minsize=25)
+        self.export_frame.grid_rowconfigure(4, minsize=25)
 
-            # EXPORT FRAME
-            self.export_frame.grid(row=15, column=3, sticky=EW)
-            self.clipboard_db_button.grid(row=0, column=0, sticky=EW)
-            self.csv_export_button.grid(row=2, column=0, sticky=EW)
-            self.xlsx_export_button.grid(row=3, column=0, sticky=EW)
-            self.KML_btn_fea_tab.grid(row=5, column=0, sticky=EW, pady=5)
-            self.export_frame.grid_rowconfigure(1, minsize=25)
-            self.export_frame.grid_rowconfigure(4, minsize=25)
+        # TABS RIGHT
+        self.tabs_main_func.grid(row=0, column=1, columnspan=1, rowspan=40)
+        # TAB 1
 
-            # TABS RIGHT
-            self.tabs_main_func.grid(row=0, column=1, columnspan=1, rowspan=40)
-            # TAB 1
+        self.clear_headers_button.grid(row=0, column=0, sticky=EW, padx=2, columnspan=1)
+        self.columns_textbox.grid(row=0, column=1, columnspan=1, sticky=EW)
 
-            self.clear_headers_button.grid(row=0, column=0, sticky=EW, padx=2, columnspan=1)
-            self.columns_textbox.grid(row=0, column=1, columnspan=1, sticky=EW)
+        self.custom_listbox_raw.grid(row=1, column=0, rowspan=40, columnspan=2, padx=3, sticky=E)
+        self.custom_listbox_processed.grid(row=1, column=3, rowspan=40, columnspan=6)
+        self.db_columns_listbox.grid(row=1, column=9, rowspan=40, columnspan=3)
 
-            self.custom_listbox_raw.grid(row=1, column=0, rowspan=40, columnspan=2, padx=3, sticky=E)
-            self.custom_listbox_processed.grid(row=1, column=3, rowspan=40, columnspan=6)
-            self.db_columns_listbox.grid(row=1, column=9, rowspan=40, columnspan=3)
+        self.clear_process_list_button.grid(row=0, column=6, columnspan=3, sticky=EW)
+        self.process_lst_row_up_btn.grid(row=0, column=3, columnspan=1, sticky=EW, padx=1)
+        self.process_lst_row_dwn_btn.grid(row=0, column=4, columnspan=1, sticky=EW, padx=1)
 
-            self.clear_process_list_button.grid(row=0, column=6, columnspan=3, sticky=EW)
-            self.process_lst_row_up_btn.grid(row=0, column=3, columnspan=1, sticky=EW, padx=1)
-            self.process_lst_row_dwn_btn.grid(row=0, column=4, columnspan=1, sticky=EW, padx=1)
+        self.filter_total_columns_textbox.grid(row=0, column=9, columnspan=2, padx=2)
+        self.scroll_pane.grid(row=1, column=12, rowspan=40, columnspan=1, sticky=NS)
+        # TAB 3
+        self.KML_line_width_lbl.grid(row=0, column=0, columnspan=1)
+        self.KML_line_width_comb.grid(row=0, column=1, columnspan=1)
+        # TAB 4
+        self.play_button.grid(row=0, column=0, columnspan=1)
+        self.play_button_stop.grid(row=0, column=1, columnspan=1)
+        # ----------------
 
-            self.filter_total_columns_textbox.grid(row=0, column=9, columnspan=2, padx=2)
-            self.scroll_pane.grid(row=1, column=12, rowspan=40, columnspan=1, sticky=NS)
-            # TAB 3
-            self.KML_line_width_lbl.grid(row=0, column=0, columnspan=1)
-            self.KML_line_width_comb.grid(row=0, column=1, columnspan=1)
-            # TAB 4
-            self.play_button.grid(row=0, column=0, columnspan=1)
-            self.play_button_stop.grid(row=0, column=1, columnspan=1)
-            # ----------------
+        col_count, row_count = self.db_process_form.grid_size()
+        for col in range(col_count):
+            self.db_process_form.grid_columnconfigure(col, minsize=20)
 
-            col_count, row_count = self.db_process_form.grid_size()
-            for col in range(col_count):
-                self.db_process_form.grid_columnconfigure(col, minsize=20)
+        # for row in range(row_count):
+        #     self.db_process_form.grid_rowconfigure(row, minsize=20)
 
-            # for row in range(row_count):
-            #     self.db_process_form.grid_rowconfigure(row, minsize=20)
+        # self.db_columns_listbox.insert(1, "Data Structure")
+        # self.db_columns_listbox.insert(2, "Algorithm")
+        # self.db_columns_listbox.insert(3, "Data Science")
+        # self.db_columns_listbox.insert(4, "Machine Learning")
+        # self.db_columns_listbox.insert(5, "Blockchain")
+        #
+        # self.total_columns_df = self.total_columns_df.append({'COL_INDEX': "Data Structure", 'COL_NAME': "Data Structure"}, ignore_index=True)
+        # self.total_columns_df = self.total_columns_df.append({'COL_INDEX': "Algorithm", 'COL_NAME': "Algorithm"},ignore_index=True)
+        # self.total_columns_df = self.total_columns_df.append({'COL_INDEX': "Data Science", 'COL_NAME': "Data Science"}, ignore_index=True)
+        # self.total_columns_df = self.total_columns_df.append({'COL_INDEX': "Machine Learning", 'COL_NAME': "Machine Learning"}, ignore_index=True)
+        # self.total_columns_df = self.total_columns_df.append({'COL_INDEX': "Blockchain", 'COL_NAME': "Blockchain"},ignore_index=True)
+        #
+        # self.total_columns_filter_backup_df = self.total_columns_filter_backup_df.append({'COL_INDEX': "Data Structure", 'COL_NAME': "Data Structure"}, ignore_index=True)
+        # self.total_columns_filter_backup_df = self.total_columns_filter_backup_df.append({'COL_INDEX': "Algorithm", 'COL_NAME': "Algorithm"},ignore_index=True)
+        # self.total_columns_filter_backup_df = self.total_columns_filter_backup_df.append({'COL_INDEX': "Data Science", 'COL_NAME': "Data Science"}, ignore_index=True)
+        # self.total_columns_filter_backup_df = self.total_columns_filter_backup_df.append({'COL_INDEX': "Machine Learning", 'COL_NAME': "Machine Learning"}, ignore_index=True)
+        # self.total_columns_filter_backup_df = self.total_columns_filter_backup_df.append({'COL_INDEX': "Blockchain", 'COL_NAME': "Blockchain"},ignore_index=True)
+        #
+        # self.custom_listbox_processed.insert(1, "1")
+        # self.custom_listbox_processed.insert(2, "2")
+        # self.custom_listbox_processed.insert(3, "3")
+        # self.custom_listbox_processed.insert(4, "4")
+        # self.custom_listbox_processed.insert(5, "5")
+        #
+        # self.process_columns_df = self.process_columns_df.append({'COL_INDEX': 1, 'COL_NAME': 1}, ignore_index=True)
+        # self.process_columns_df = self.process_columns_df.append({'COL_INDEX': 2, 'COL_NAME': 2}, ignore_index=True)
+        # self.process_columns_df = self.process_columns_df.append({'COL_INDEX': 3, 'COL_NAME': 3}, ignore_index=True)
+        # self.process_columns_df = self.process_columns_df.append({'COL_INDEX': 4, 'COL_NAME': 4}, ignore_index=True)
+        # self.process_columns_df = self.process_columns_df.append({'COL_INDEX': 5, 'COL_NAME': 5}, ignore_index=True)
 
-            # self.db_columns_listbox.insert(1, "Data Structure")
-            # self.db_columns_listbox.insert(2, "Algorithm")
-            # self.db_columns_listbox.insert(3, "Data Science")
-            # self.db_columns_listbox.insert(4, "Machine Learning")
-            # self.db_columns_listbox.insert(5, "Blockchain")
-            #
-            # self.total_columns_df = self.total_columns_df.append({'COL_INDEX': "Data Structure", 'COL_NAME': "Data Structure"}, ignore_index=True)
-            # self.total_columns_df = self.total_columns_df.append({'COL_INDEX': "Algorithm", 'COL_NAME': "Algorithm"},ignore_index=True)
-            # self.total_columns_df = self.total_columns_df.append({'COL_INDEX': "Data Science", 'COL_NAME': "Data Science"}, ignore_index=True)
-            # self.total_columns_df = self.total_columns_df.append({'COL_INDEX': "Machine Learning", 'COL_NAME': "Machine Learning"}, ignore_index=True)
-            # self.total_columns_df = self.total_columns_df.append({'COL_INDEX': "Blockchain", 'COL_NAME': "Blockchain"},ignore_index=True)
-            #
-            # self.total_columns_filter_backup_df = self.total_columns_filter_backup_df.append({'COL_INDEX': "Data Structure", 'COL_NAME': "Data Structure"}, ignore_index=True)
-            # self.total_columns_filter_backup_df = self.total_columns_filter_backup_df.append({'COL_INDEX': "Algorithm", 'COL_NAME': "Algorithm"},ignore_index=True)
-            # self.total_columns_filter_backup_df = self.total_columns_filter_backup_df.append({'COL_INDEX': "Data Science", 'COL_NAME': "Data Science"}, ignore_index=True)
-            # self.total_columns_filter_backup_df = self.total_columns_filter_backup_df.append({'COL_INDEX': "Machine Learning", 'COL_NAME': "Machine Learning"}, ignore_index=True)
-            # self.total_columns_filter_backup_df = self.total_columns_filter_backup_df.append({'COL_INDEX': "Blockchain", 'COL_NAME': "Blockchain"},ignore_index=True)
-            #
-            # self.custom_listbox_processed.insert(1, "1")
-            # self.custom_listbox_processed.insert(2, "2")
-            # self.custom_listbox_processed.insert(3, "3")
-            # self.custom_listbox_processed.insert(4, "4")
-            # self.custom_listbox_processed.insert(5, "5")
-            #
-            # self.process_columns_df = self.process_columns_df.append({'COL_INDEX': 1, 'COL_NAME': 1}, ignore_index=True)
-            # self.process_columns_df = self.process_columns_df.append({'COL_INDEX': 2, 'COL_NAME': 2}, ignore_index=True)
-            # self.process_columns_df = self.process_columns_df.append({'COL_INDEX': 3, 'COL_NAME': 3}, ignore_index=True)
-            # self.process_columns_df = self.process_columns_df.append({'COL_INDEX': 4, 'COL_NAME': 4}, ignore_index=True)
-            # self.process_columns_df = self.process_columns_df.append({'COL_INDEX': 5, 'COL_NAME': 5}, ignore_index=True)
+        self.db_columns_listbox.bind('<Double-Button>', self.custom_listbox_processed_add)  # <Button-3>
+        self.db_columns_listbox.bind('<Button-3>', self.custom_listbox_processed_replace)
+        self.custom_listbox_processed.bind('<Double-Button>', self.custom_listbox_processed_delete)
 
-            self.db_columns_listbox.bind('<Double-Button>', self.custom_listbox_processed_add)  # <Button-3>
-            self.db_columns_listbox.bind('<Button-3>', self.custom_listbox_processed_replace)
-            self.custom_listbox_processed.bind('<Double-Button>', self.custom_listbox_processed_delete)
+        cfg_line_width = self.cfg.read_cfg(section="KML", key='line_width')
+        if cfg_line_width not in self.kml_line_width_lst:
+            self.KML_line_width_var.set(3)
+        else:
+            self.KML_line_width_var.set(cfg_line_width)
 
-            cfg_line_width = self.cfg.read_cfg(section="KML", key='line_width')
-            if cfg_line_width not in self.kml_line_width_lst:
-                self.KML_line_width_var.set(3)
-            else:
-                self.KML_line_width_var.set(cfg_line_width)
+        if arg != '' and os.path.exists(arg):
+            # пишем аргумент в строку пути
+            self.db_path = arg
+            # парсим инч
+            arg_inch = parse_inch_prj(arg)
 
-            if arg != '' and os.path.exists(arg):
-                # пишем аргумент в строку пути
-                self.db_path = arg
-                # парсим инч
-                arg_inch = parse_inch_prj(arg)
-
-                # если нашли инч то селектим его в выпадающем списке
-                if arg_inch is not None:
-                    inch_index = self.inch_list.index(arg_inch)
-                    self.diam_menu_variable.set(self.inch_names_list[inch_index])
-                    self.db_load()
-                else:
-                    self.diam_menu_variable.set(self.inch_names_list[6])
-                    self.db_file_label.config(text=os.path.basename(self.db_path))
+            # если нашли инч то селектим его в выпадающем списке
+            if arg_inch is not None:
+                inch_index = self.inch_list.index(arg_inch)
+                self.diam_menu_variable.set(self.inch_names_list[inch_index])
+                self.db_load()
             else:
                 self.diam_menu_variable.set(self.inch_names_list[6])
-
-            self.db_process_form.protocol("WM_DELETE_WINDOW", self.on_closing)
-
-            self.db_process_form.mainloop()
-
+                self.db_file_label.config(text=os.path.basename(self.db_path))
         else:
-            self.db_process_form.geometry("1900x850")
-            self.db_process_form.title('EXPIRED')
-            self.db_process_form.geometry("300x50")
+            self.diam_menu_variable.set(self.inch_names_list[6])
 
-            exp_label = Label(master=self.db_process_form, text="Your version has expired", fg='red', font=15)
-            exp_label.pack()
-            exp_label2 = Label(master=self.db_process_form, text="Please update", fg='red', font=15)
-            exp_label2.pack()
-
-            def on_closing():
-                self.db_process_form.destroy()
-                sys.exit()
-
-            self.db_process_form.protocol("WM_DELETE_WINDOW", on_closing)
-            self.db_process_form.mainloop()
+        self.db_process_form.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         self.db_process_form.mainloop()
+
 
     def write_to_developer(self):
         msg = self.columns_variable.get()
@@ -475,7 +480,7 @@ class DB_FORM:
             return True
 
         except Exception as ex:
-            logger.error('TLG msg error')
+            logger.exception('TLG msg error')
             return False
 
     def get_def_tab(self):
@@ -1320,7 +1325,7 @@ class DB_FORM:
             else:
                 or_df = self.db_df[self.db_df['#DOC'].isin(checked_items_doc)]
                 if len(or_df) != 0:
-                    checked_df = pd.concat([checked_df, or_df])
+                    checked_df = pd.concat([checked_df, or_df]).drop_duplicates()
 
         if len(checked_items_marker) != 0:
             if checked_df is None:
@@ -1332,7 +1337,7 @@ class DB_FORM:
             else:
                 or_df = self.db_df[self.db_df['#REF'].isin(checked_items_marker)]
                 if len(or_df) != 0:
-                    checked_df = pd.concat([checked_df, or_df])
+                    checked_df = pd.concat([checked_df, or_df]).drop_duplicates()
 
         # если не нашли чекнутых - возвращаем целый DF
         if checked_df is None:
@@ -1342,7 +1347,20 @@ class DB_FORM:
         if len(checked_df) == 0:
             return None
 
+        # сортируем с выставлением швов на первое место
+        checked_df = checked_df.sort_values('#DIST_START')
+        # вычитаем и добавляем к дистации швов для корректной сортировки Аномалий и прочего на дистанции шва
+        checked_df.loc[checked_df['#FEA_CODE'].isin(self.df_dbf_class.welds_list), '#DIST_START'] = \
+            checked_df.loc[checked_df['#FEA_CODE'].isin(self.df_dbf_class.welds_list), '#DIST_START'] - 0.0001
+        # сортировка по дистации
+        checked_df = checked_df.sort_values('#DIST_START')
+        checked_df.loc[checked_df['#FEA_CODE'].isin(self.df_dbf_class.welds_list), '#DIST_START'] = \
+            checked_df.loc[checked_df['#FEA_CODE'].isin(self.df_dbf_class.welds_list), '#DIST_START'] + 0.0001
+
+
         checked_df = checked_df.reset_index()
+
+
 
         return checked_df
 
@@ -1460,6 +1478,13 @@ if __name__ == "__main__":
 
             if run_atr == "-D":
                 export_default(dbf_path=path)
+                input("")
+            if run_atr == '-K':
+                cfg = CFG('DB Process')
+                cfg_line_width = cfg.read_cfg(section="KML", key='line_width')
+                kml_path = DBtoKML.bKML().dbf_to_kml_fast(path, cfg_line_width)
+                if kml_path is not None:
+                    os.startfile(kml_path)
                 input("")
             else:
                 input("### Error: Wrong Attribute")

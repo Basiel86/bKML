@@ -1,0 +1,28 @@
+2022.10.10 00:01:18 - app.DB_Process.parse_inch:79 - INFO - Inch parser (PRJ): 8.625 inch
+2022.10.10 00:01:18 - app.DF_DBF:148 - DEBUG - Get DBF file: D:/OneDrive/Macro/PYTHON/bKML/Test/1nxbu.dbf
+2022.10.10 00:01:21 - app.DF_DBF:406 - INFO - DB load status: Loaded successfully
+2022.10.10 00:01:22 - app.DB_Process:1169 - INFO - DB Load Info: DB Loaded Successfully, total records: 8720
+2022.10.10 00:02:08 - app.DB_Process:1342 - INFO - # Info: Rows in clipboard: 272
+2022.10.10 00:02:28 - app.DF_DBF:526 - INFO - # Excel custom header Info (DF_DBF): Columns saved: 19
+2022.10.10 00:02:29 - app.DB_Process:746 - INFO - File saved: D:/OneDrive/Macro/PYTHON/bKML/Test\1nxbu.csv
+2022.10.10 00:02:29 - app.DB_Process:1393 - INFO - # Info: Rows Exported: 272
+2022.10.10 00:02:36 - app.DF_DBF:557 - INFO - # Excel cutom header Info (DF_DBF): Columns saved: 19
+2022.10.10 00:02:37 - app.DB_Process:746 - INFO - File saved: D:/OneDrive/Macro/PYTHON/bKML/Test\1nxbu.xlsx
+2022.10.10 00:02:37 - app.DB_Process:1393 - INFO - # Info: Rows Exported: 272
+2022.10.10 00:03:20 - app.DB_Process.parse_templates:104 - INFO - Save template Info: <New Template> template Saved
+2022.10.10 00:03:29 - app.DB_Process.parse_templates:84 - INFO - Delete template Info: <New Template> deleted
+2022.10.10 00:06:27 - app.DF_DBF:69 - DEBUG - DBF_INDEX file info: INI
+2022.10.10 00:06:27 - app.DF_DBF:69 - DEBUG - STRUCT file info: INI
+2022.10.10 00:06:36 - app.DB_Process.parse_inch:79 - INFO - Inch parser (PRJ): 8.625 inch
+2022.10.10 00:06:36 - app.DF_DBF:148 - DEBUG - Get DBF file: D:/OneDrive/Macro/PYTHON/bKML/Test/2nwfm.DBF
+2022.10.10 00:06:36 - app.DF_DBF:406 - INFO - DB load status: Loaded successfully
+2022.10.10 00:06:38 - app.DB_Process:1169 - INFO - DB Load Info: DB Loaded Successfully, total records: 2228
+2022.10.10 00:06:42 - app.DB_Process:1401 - INFO - Export Error: Columns for Export not selected...
+2022.10.10 00:06:56 - app.DB_Process:746 - INFO - File saved: D:/OneDrive/Macro/PYTHON/bKML/Test\2nwfm.kmz
+2022.10.10 00:09:09 - app.DF_DBF:69 - DEBUG - DBF_INDEX file info: INI
+2022.10.10 00:09:09 - app.DF_DBF:69 - DEBUG - STRUCT file info: INI
+2022.10.10 00:09:30 - app.DB_Process.parse_inch:79 - INFO - Inch parser (PRJ): 8.625 inch
+2022.10.10 00:09:30 - app.DF_DBF:148 - DEBUG - Get DBF file: D:/OneDrive/Macro/PYTHON/bKML/Test/1nxbu.dbf
+2022.10.10 00:09:32 - app.DF_DBF:406 - INFO - DB load status: Loaded successfully
+2022.10.10 00:09:33 - app.DB_Process:1172 - INFO - DB Load Info: DB Loaded Successfully, total records: 8720
+2022.10.10 00:09:36 - app.DB_Process:732 - ERROR - KML, No features with coordinates

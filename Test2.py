@@ -1,8 +1,11 @@
-import gdown
-
-output = "FR.rar"
-g_path_compl = 'https://drive.google.com/file/d/1zEbwU3DzrKxLUU8ywP1ER4BZLL75v2-m/view?usp=sharing'
-g_path_f = 'https://drive.google.com/drive/folders/1JvSwjtzCVPVaayF0yKpepwRK65wEuEnE?usp=sharing'
+import pandas as pd
 
 if __name__ == '__main__':
-    gdown.download(g_path_f, output, fuzzy=True)
+    df1 = pd.DataFrame({'lkey': ['foo', 'bar', 'baz', 'foo5'],
+                        'value': [1, 2, 3, 5]})
+    df2 = pd.DataFrame({'lkey': ['foo', 'bar', 'baz', 'foo1'],
+                        'value': [2, 2, 3, 6]})
+
+    df1=pd.concat([df1, df2]).drop_duplicates().reset_index(drop=True)
+
+    print(df1)

@@ -2,8 +2,11 @@ import simplekml
 import DF_DBF
 import os
 import traceback
+from datetime import datetime
 
 import logging
+
+import parse_inch
 
 logger = logging.getLogger('app.DBtoKML')
 
@@ -369,6 +372,20 @@ class bKML:
         df = dbf_conf_init.convert_dbf(diameter=diameter, dbf_path=dbf_path, lang=lang)
         return cls, df, dbf_path
 
+    def dbf_to_kml_fast(self, dbf_path, line_width):
+
+        logger.info("DBF to KML Fast")
+        print(f'# Info (KML): DBF to KML Fast: {dbf_path}')
+
+
+        diameter = parse_inch.parse_inch_prj(dbf_path)
+        if diameter is None:
+            diameter = float(input("Enter Diameter: "))
+
+        cls, df, dbf_path = self.dbf_load(dbf_path=dbf_path, lang='RU', diameter=diameter)
+        kml_path = self.dbf_to_kml(line_width, df=df, df_dbf_class=cls, export_path=dbf_path)
+        return kml_path
+
     def dbf_to_kml(self, line_width, df_dbf_class, df, export_path):
 
         """
@@ -480,10 +497,18 @@ class bKML:
             self.__kml_write_top_lvl(feature_name=current_anom_name, kml_data=top_kml_data,
                                      isvisible=isvisible, points_folder=points_folder)
 
-        absbath = os.path.dirname(export_path)
+        absbath = os.path.dirname(export_path) + '\KML'
+
+        if not os.path.exists(absbath):
+            os.mkdir(absbath)
+
         basename = os.path.basename(export_path)
         exportpath = os.path.join(absbath, basename)
         exportpath = f'{exportpath[:-4]}'
+
+        now = datetime.now()
+        dt_string = now.strftime("%Y.%m.%d %H.%M.%S")
+        exportpath = f'{exportpath} - {dt_string} - {len(df_DBF_raw)} records'
 
         self.__kml_save(exportpath)
 
@@ -494,20 +519,22 @@ class bKML:
 
         # print(f"KML создана по {len(df_DBF)} записям"'\n')
 
+
 def __main():
-
-    DEBUG = 0
-
+    DEBUG = 1
 
     kml_class = bKML()
 
     if DEBUG == 1:
-        path = r'd:\###WORK\###\1nzhu_new_bends.dbf'
-        #path = r'd:\###WORK\###\123\1nzhu_new_bends.dbf'
-        diameter = 11
-        lang = 'RU'
-        cls, df, dbf_path = kml_class.dbf_load(dbf_path=path, lang=lang, diameter=diameter)
-        kml_class.dbf_to_kml(line_width=3, df=df, df_dbf_class=cls, export_path=dbf_path)
+        path = r'd:\WORK\Beloyarskneftegaz\NBF 12 inch НП п.Андра-НПС Красноленинская (подводный переход) основная нитка, 15 km\Report\FR\DataBase\111\1nbfm.DBF'
+        # path = r'd:\###WORK\###\123\1nzhu_new_bends.dbf'
+
+        kml_class.dbf_to_kml_fast(path, 3)
+
+        # diameter = 11
+        # lang = 'RU'
+        # cls, df, dbf_path = kml_class.dbf_load(dbf_path=path, lang=lang, diameter=diameter)
+        # kml_class.dbf_to_kml(line_width=3, df=df, df_dbf_class=cls, export_path=dbf_path)
     else:
         try:
             lang = 'RU'
