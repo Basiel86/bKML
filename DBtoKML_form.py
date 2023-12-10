@@ -10,7 +10,7 @@ from parse_inch import parse_inch_prj
 from parse_cfg import CFG
 
 try:
-    EXP_DAY = '2022-11-05'
+    EXP_DAY = '2023-11-05'
 
     lng_list = ["RU", "EN"]
     dbf_ext_list = ['dbf', 'DBF']

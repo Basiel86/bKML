@@ -603,26 +603,28 @@ def cross_columns_list(list_exist, list_target):
 
 if __name__ == '__main__':
 
-    DEBUG = 0
+    DEBUG = 1
 
     diam = None
     lang = "RU"
     custom_columns = []
+    path = ''
 
     if DEBUG == 1:
-        path = r"d:\###WORK\###\123\1nzhu_new_bends.dbf"
+        arg = r"C:\Users\BaZ\YandexDisk\Personal\OneDrive\Macro\PYTHON\bKML\Test\1KMA.dbf"
     else:
         arg = ''
 
-        if arg != '':
-            path = arg
-        else:
-            path = input("DBF path: ")
+    if arg != '':
+        path = arg
+    else:
+        path = input("DBF path: ")
 
-        if path[-3:] != 'DBF' and path[-3:] != 'dbf':
-            input("##ERROR: not DBF link")
-        else:
-            export_default(path)
+    if path[-3:] != 'DBF' and path[-3:] != 'dbf':
+        input("##ERROR: not DBF link")
+    else:
+        export_default(path)
+        print("~~~ Export default Done ~~~")
 
     if DEBUG != 1:
         input("")

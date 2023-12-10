@@ -1,4 +1,5 @@
 from tkinter import *
+import ntplib
 import parse_inch
 import parse_templates
 from DF_DBF import *
@@ -15,8 +16,10 @@ from play_sound import PlaySound
 from parse_cfg import CFG
 
 # python -m pip install tkinterdnd2
-from TkinterDnD2 import TkinterDnD, DND_FILES
-#from TkinterDnD2 import *
+# import tkinterDnD
+# from TkinterDnD2 import TkinterDnD, DND_FILES
+# from tkinterdnd2 import *
+
 import DBtoKML
 from other_functions import cls_pyfiglet
 import logging.handlers
@@ -36,10 +39,22 @@ class DB_FORM:
 
     def __init__(self):
 
-        self.EXP_DAY = '2023-06-12'
+        self.EXP_DAY = '2024-03-01'
+        now_date = datetime.strptime('3024-01-01', "%Y-%m-%d").date()
         exp_date_formatted = datetime.strptime(self.EXP_DAY, "%Y-%m-%d").date()
-        now_date = date.today()
-        days_left = exp_date_formatted - now_date
+        is_internet_time = False
+        try:
+            ntp_client = ntplib.NTPClient()
+            response = ntp_client.request('pool.ntp.org')
+            # print(ctime(response.tx_time))
+            now_date = datetime.fromtimestamp(response.tx_time).strftime("%Y-%m-%d")
+            now_date = datetime.strptime(now_date, "%Y-%m-%d").date()
+            is_internet_time = True
+        except Exception as ex:
+
+            print("ERROR: Cannot get internet date!!!")
+
+            # days_left = exp_date_formatted - now_date
 
         cls_pyfiglet('DB Process', 'larry3d')
         self.cfg = CFG('DB Process')
@@ -98,11 +113,12 @@ class DB_FORM:
         # self.diam_list = [4, 4.5, 5.563, 6.625, 8.625, 10.75, 12.75, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38,
         #                   40, 42, 44, 46, 48, 52, 56]
 
-        self.db_process_form = TkinterDnD.Tk()
+        # self.db_process_form = tkinterDnD.Tk()
+        self.db_process_form = Tk()
 
         self.db_process_form.iconbitmap(resource_path('icons/DBF_icon.ico'))
-        self.db_process_form.drop_target_register(DND_FILES)
-        self.db_process_form.dnd_bind('<<Drop>>', self.open_with_dnd)
+        # self.db_process_form.drop_target_register(DND_FILES)
+        # self.db_process_form.dnd_bind('<<Drop>>', self.open_with_dnd)
 
         if exp_date_formatted >= now_date:
 
@@ -253,7 +269,8 @@ class DB_FORM:
             self.process_lst_row_dwn_btn = Button(master=self.tab1_func, image=image_dwn,
                                                   command=self.custom_listbox_processed_row_dwn, width=22)
 
-            self.clear_process_list_button = Button(master=self.tab1_func, text="Clear", command=self.clear_process_listbox)
+            self.clear_process_list_button = Button(master=self.tab1_func, text="Clear",
+                                                    command=self.clear_process_listbox)
             self.filter_variable = StringVar()
             self.filter_variable.trace("w", self.filter_total_columns_listbox)
             self.filter_total_columns_textbox = Entry(master=self.tab1_func, width=35,
@@ -281,18 +298,30 @@ class DB_FORM:
             self.form_init()
 
         else:
-            self.db_process_form.geometry("1900x850")
-            self.db_process_form.title('EXPIRED')
-            self.db_process_form.geometry("300x60")
-            self.db_process_form.resizable(False, False)
+            # self.db_process_form.geometry("1900x850")
+            # self.db_process_form.title('EXPIRED')
+            # self.db_process_form.geometry("350x60")
+            # self.db_process_form.resizable(False, False)
             # self.db_process_form.minsize(300, 60)
             # self.db_process_form.maxsize(300, 60)
 
+            if is_internet_time:
+                self.db_process_form.title('EXPIRED')
+                self.db_process_form.geometry("350x60")
+                exp_label = Label(master=self.db_process_form, text="Your version has expired", fg='red', font=15)
+                exp_label.pack()
+                exp_label2 = Label(master=self.db_process_form, text="Please update", fg='red', font=15)
+                exp_label2.pack()
+            else:
+                self.db_process_form.title('Internet Time')
+                self.db_process_form.geometry("500x40")
+                exp_label = Label(master=self.db_process_form, text="Can't get internet time. "
+                                                                    "Check your internet connection.",
+                                  fg='red',
+                                  font=15)
+                exp_label.pack()
+            self.db_process_form.resizable(False, False)
 
-            exp_label = Label(master=self.db_process_form, text="Your version has expired", fg='red', font=15)
-            exp_label.pack()
-            exp_label2 = Label(master=self.db_process_form, text="Please update", fg='red', font=15)
-            exp_label2.pack()
 
             # def on_closing():
             #     self.db_process_form.destroy()
@@ -443,7 +472,6 @@ class DB_FORM:
         self.db_process_form.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         self.db_process_form.mainloop()
-
 
     def write_to_developer(self):
         msg = self.columns_variable.get()
@@ -1357,10 +1385,7 @@ class DB_FORM:
         checked_df.loc[checked_df['#FEA_CODE'].isin(self.df_dbf_class.welds_list), '#DIST_START'] = \
             checked_df.loc[checked_df['#FEA_CODE'].isin(self.df_dbf_class.welds_list), '#DIST_START'] + 0.0001
 
-
         checked_df = checked_df.reset_index()
-
-
 
         return checked_df
 
@@ -1468,7 +1493,6 @@ class DB_FORM:
 
 
 if __name__ == "__main__":
-
     arg = ''
 
     try:
@@ -1489,8 +1513,8 @@ if __name__ == "__main__":
             else:
                 input("### Error: Wrong Attribute")
                 logger.error(f'Wrong Attribute: {run_atr}')
-
         else:
+            print('DB_FORM has started')
             DB_FORM()
     except Exception as ex:
         logger.exception("RUNTIME ERROR")
